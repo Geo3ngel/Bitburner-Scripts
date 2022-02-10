@@ -1,87 +1,105 @@
-/** @param {NS} ns **/
+import { 
+	PAUSE, UNPAUSE,KILL, 
+	AUTO_NODE_INBOUND_PORT,
+	CONTROL_INBOUND_PORT, 
+	HOME
+	} from "lib/customConstants.js";
 const LVL = 0;
 const RAM = 1;
 const CORE = 2;
-const HOME = "home";
+const DEATH_MSG = "AUTO_NET"
 
 export async function main(ns) {
+	let paused = false;
 	while (ns.hacknet.numNodes() < ns.hacknet.maxNumNodes()) {
-		let newNodeRatio = await calcNewNodeValueRatio(ns);
-
-		// Find highest ratio from all current nodes!
-		let bestNodeToUpgrade = -1;
-		let bestProperty = -1; // 0-2 are level, ram, and core
-		let bestRatio = 0;
-		let lvlRatio;
-		let ramRatio;
-		let coreRatio;
-		// Finds the best upgrade value amongst existing nodes
-		for (let i = 0; i < ns.hacknet.numNodes(); i++) {
-			lvlRatio = await calcLevelUpgradeValueRatio(ns, i);
-			ramRatio = await calcRamUpgradeValueRatio(ns, i);
-			coreRatio = await calcCoreUpgradeValueRatio(ns, i);
-			// ns.print(`Node${i}: lvl:${lvlRatio}, ram:${ramRatio}, core:${coreRatio}`);
-			if (lvlRatio > ramRatio && lvlRatio > coreRatio) {
-				// Lvl ratio is the highest for this node
-				if (lvlRatio > bestRatio) {
-					bestRatio = lvlRatio;
-					bestProperty = LVL;
-					bestNodeToUpgrade = i;
-				}
-			} else if (ramRatio > coreRatio) {
-				// Ram ratio is the highest for this node
-				if (ramRatio > bestRatio) {
-					bestRatio = ramRatio;
-					bestProperty = RAM;
-					bestNodeToUpgrade = i;
-				}
-			} else {
-				// Core ratio is the highest for this node
-				if (coreRatio > bestRatio) {
-					bestRatio = coreRatio;
-					bestProperty = CORE;
-					bestNodeToUpgrade = i;
-				}
-			}
+		switch (ns.readPort(AUTO_NODE_INBOUND_PORT)) {
+			case PAUSE:
+				paused = true;
+				break;
+			case UNPAUSE:
+				paused = false;
+				break;
+			case KILL:
+				ns.tryWritePort(CONTROL_INBOUND_PORT, DEATH_MSG)
+				return;
 		}
 
-		// Buys a new node or the best valued upgrade
-		let bal = ns.getServerMoneyAvailable(HOME);
-		// ns.print(`NewNodw:${newNodeRatio} > BestRatio:${bestRatio}`)
-		if (newNodeRatio > bestRatio) {
-			// Buy a new node!
-			ns.print("Trying to buy a new Node...")
-			if (ns.hacknet.getPurchaseNodeCost() < bal) {
-				ns.hacknet.purchaseNode();
-				ns.print("Bought a new Node!")
+		if (!paused) {
+			let newNodeRatio = await calcNewNodeValueRatio(ns);
+
+			// Find highest ratio from all current nodes!
+			let bestNodeToUpgrade = -1;
+			let bestProperty = -1; // 0-2 are level, ram, and core
+			let bestRatio = 0;
+			let lvlRatio;
+			let ramRatio;
+			let coreRatio;
+			// Finds the best upgrade value amongst existing nodes
+			for (let i = 0; i < ns.hacknet.numNodes(); i++) {
+				lvlRatio = await calcLevelUpgradeValueRatio(ns, i);
+				ramRatio = await calcRamUpgradeValueRatio(ns, i);
+				coreRatio = await calcCoreUpgradeValueRatio(ns, i);
+				// ns.print(`Node${i}: lvl:${lvlRatio}, ram:${ramRatio}, core:${coreRatio}`);
+				if (lvlRatio > ramRatio && lvlRatio > coreRatio) {
+					// Lvl ratio is the highest for this node
+					if (lvlRatio > bestRatio) {
+						bestRatio = lvlRatio;
+						bestProperty = LVL;
+						bestNodeToUpgrade = i;
+					}
+				} else if (ramRatio > coreRatio) {
+					// Ram ratio is the highest for this node
+					if (ramRatio > bestRatio) {
+						bestRatio = ramRatio;
+						bestProperty = RAM;
+						bestNodeToUpgrade = i;
+					}
+				} else {
+					// Core ratio is the highest for this node
+					if (coreRatio > bestRatio) {
+						bestRatio = coreRatio;
+						bestProperty = CORE;
+						bestNodeToUpgrade = i;
+					}
+				}
 			}
-		} else {
-			switch (bestProperty) {
-				case LVL:
-					if (ns.hacknet.getLevelUpgradeCost(bestNodeToUpgrade) < bal) {
-						ns.hacknet.upgradeLevel(bestNodeToUpgrade);
-						ns.print(`Upgrading LVL of node ${bestNodeToUpgrade}`)
-					}
-					break;
-				case RAM:
-					if (ns.hacknet.getRamUpgradeCost(bestNodeToUpgrade) < bal) {
-						ns.hacknet.upgradeRam(bestNodeToUpgrade);
-						ns.print(`Upgrading RAM of node ${bestNodeToUpgrade}`)
-					}
-					break;
-				case CORE:
-					if (ns.hacknet.getCoreUpgradeCost(bestNodeToUpgrade) < bal) {
-						ns.hacknet.upgradeCore(bestNodeToUpgrade);
-						ns.print(`Upgrading CORES of node ${bestNodeToUpgrade}`)
-					}
-					break;
-				default:
-					ns.print("No best property chosen?")
+
+			// Buys a new node or the best valued upgrade
+			let bal = ns.getServerMoneyAvailable(HOME);
+			// ns.print(`NewNodw:${newNodeRatio} > BestRatio:${bestRatio}`)
+			if (newNodeRatio > bestRatio) {
+				// Buy a new node!
+				ns.print("Trying to buy a new Node...")
+				if (ns.hacknet.getPurchaseNodeCost() < bal) {
+					ns.hacknet.purchaseNode();
+					ns.print("Bought a new Node!")
+				}
+			} else {
+				switch (bestProperty) {
+					case LVL:
+						if (ns.hacknet.getLevelUpgradeCost(bestNodeToUpgrade) < bal) {
+							ns.hacknet.upgradeLevel(bestNodeToUpgrade);
+							ns.print(`Upgrading LVL of node ${bestNodeToUpgrade}`)
+						}
+						break;
+					case RAM:
+						if (ns.hacknet.getRamUpgradeCost(bestNodeToUpgrade) < bal) {
+							ns.hacknet.upgradeRam(bestNodeToUpgrade);
+							ns.print(`Upgrading RAM of node ${bestNodeToUpgrade}`)
+						}
+						break;
+					case CORE:
+						if (ns.hacknet.getCoreUpgradeCost(bestNodeToUpgrade) < bal) {
+							ns.hacknet.upgradeCore(bestNodeToUpgrade);
+							ns.print(`Upgrading CORES of node ${bestNodeToUpgrade}`)
+						}
+						break;
+					default:
+						ns.print("No best property chosen?")
+				}
 			}
 		}
 		await ns.sleep("50");
-		// Ideally would like to sleep for how long it should take based on current production rates to reach the next level up!
-		// The default being every second or so...
 	}
 }
 
@@ -143,7 +161,7 @@ export async function calcNewNodeValueRatio(ns) {
 	}
 	let valueRatio = (totalHacknetNodeProduction / numberOfNodes) / ns.hacknet.getPurchaseNodeCost();
 	// ns.print(`valueRatio:${valueRatio}, totalProduction:${totalHacknetNodeProduction}, Node#${numberOfNodes}`)
-	if(isNaN(valueRatio)){
+	if (isNaN(valueRatio)) {
 		valueRatio = 1;
 	}
 	return valueRatio;
