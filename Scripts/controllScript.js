@@ -53,7 +53,7 @@ const WEAKEN = "weaken.js";
 const GROW = "grow.js";
 const HACK = "hack.js";
 
-async function init(){
+async function init() {
 	vulnerableServers = [];
 	serversToExploit = new PriorityQueue(); // Prioritized by # of exploits required
 	exploits = 0;
@@ -71,16 +71,9 @@ export async function main(ns) {
 	init();
 	await countExploits(ns);
 
-	// Run the initial scan
-	queuedServers = ns.scan();
-
+	// Traversal should generate a list of all servers, ideally seperating them into hackable/notHackable
 	// Evaluating Servers & Cracking them!
-	while (queuedServers.length > 0){
-		let server = queuedServers.shift();
-		traversedServers.push(server);
-
-		await processServer(ns, server)
-	}
+	traverseServers();
 	ns.print(`Vulnerable Servers: ${vulnerableServers}`);
 
 	// SCPs virus to vulnerable servers
@@ -95,61 +88,97 @@ export async function main(ns) {
 	await ns.sleep(10000)
 }
 
+// TODO: INITIAL traversal of ALL servers, to split them up into catagories for future processing!
+// Traversal should generate a list of all servers, ideally seperating them into exploited/notExploited, and hackable/notHackable
+// Evaluating Servers & Cracking them!
+async function traverseServers() {
+	// Run the initial scan
+	// traversedServers acts as the total list of servers once this is done!
+	queuedServers = ns.scan();
+	let server;
+	while (queuedServers.length > 0) {
+		server = queuedServers.shift();
+		traversedServers.push(server);
+
+		await processServer(ns, server)
+	}
+}
+
 export async function countExploits(ns) {
-	if(ns.fileExists("BruteSSH.exe")){
+	if (ns.fileExists("BruteSSH.exe")) {
 		exploits++;
 	}
-	if(ns.fileExists("FTPCrack.exe")){
+	if (ns.fileExists("FTPCrack.exe")) {
 		exploits++;
 	}
-	if(ns.fileExists("HTTPWorm.exe")){
+	if (ns.fileExists("HTTPWorm.exe")) {
 		exploits++;
 	}
-	if(ns.fileExists("relaySMTP.exe")){
+	if (ns.fileExists("relaySMTP.exe")) {
 		exploits++;
 	}
-	if(ns.fileExists("SQLInject.exe")){
+	if (ns.fileExists("SQLInject.exe")) {
 		exploits++;
 	}
 }
 
+async function crackServer(server, reqPorts) {
+	switch (reqPorts) {
+		case 5:
+			ns.sqlinject(server)
+		case 4:
+			ns.httpworm(server)
+		case 3:
+			ns.relaysmtp(server)
+		case 2:
+			ns.ftpcrack(server)
+		case 1:
+			ns.brutessh(server)
+		default:
+			ns.nuke(server)
+	}
+}
+
+// Used for initial traversal
 export async function processServer(ns, server) {
-	if(!ns.hasRootAccess(server)){
+	if (!ns.hasRootAccess(server)) {
+		let reqPorts = ns.getServerNumPortsRequired(server);
 		// Attempt to crack
-		if(ns.getServerNumPortsRequired(server) <= exploits){
-			try{
-				switch (ns.getServerNumPortsRequired(server)){
-					case 5:
-						ns.sqlinject(server)
-					case 4:
-						ns.httpworm(server)
-					case 3:
-						ns.relaysmtp(server)
-					case 2:
-						ns.ftpcrack(server)
-					case 1:
-						ns.brutessh(server)
-					default:
-						ns.nuke(server)
-					}
-			}catch{
-				ns.print(`Can't crack ${server} yet.`);
-			}
+		if (reqPorts <= exploits) {
+			crackServer(server, reqPorts);
+		} else {
+			ns.print(`Can't crack ${server} yet.`);
+			serversToExploit.enqueue(server, reqPorts);
 		}
 	}
 
-	if(ns.hasRootAccess(server)){
-		vulnerableServers.push(server)
-		let subServers = ns.scan(server)
-		for (let index = 0; index < subServers.length; index++) {
-			let subServer = subServers[index];
-			if (!traversedServers.includes(subServer)){
-				queuedServers.push(subServer)
-			}
+	// Add to vulnerable server list
+	if (ns.hasRootAccess(server)) {
+		vulnerableServers.push(server);
+	}
+	// Continues with the traversal
+	let subServers = ns.scan(server)
+	for (let index = 0; index < subServers.length; index++) {
+		let subServer = subServers[index];
+		if (!traversedServers.includes(subServer)) {
+			queuedServers.push(subServer)
 		}
+	}
+
+	// Split into hackable/notHackable groupings
+	isHackable(server);
+}
+
+async function isHackable(server){
+	let reqHackingLvl =  ns.getServerRequiredHackingLevel(server);
+	if(ns.getHackingLevel() >= reqHackingLvl){
+		hackableServers.push(server);
+	}else{
+		notHackableServers.enqueue(server, reqHackingLvl);
 	}
 }
 
+// TODO: Completely revamp/replace this with Hacking event manager.
 export async function infectVulnerableServers(ns) {
 	// Scp virus script to servers
 	for (let index = 0; index < vulnerableServers.length; index++) {
@@ -158,11 +187,11 @@ export async function infectVulnerableServers(ns) {
 		ns.print(`Infected ${server} with Virus.`)
 	}
 
-		// TODO: Run virus on vulnerable server(s) against selected target server(s)
-	
+	// TODO: Run virus on vulnerable server(s) against selected target server(s)
+
 	// TODO: Determine highest value targetable server (Profile hacking targets)
 	// TODO: Target most valuable servers (make a list)
-		// Then send out `hack` command to all vulnerable servers targeting X server
+	// Then send out `hack` command to all vulnerable servers targeting X server
 	// ns.print(`Hacking ${targetServer}`);
 	// await ns.hack(targetServer);
 	// await ns.grow(targetServer);
@@ -182,12 +211,12 @@ export async function profileTargets(ns) {
 	for (let index = 0; index < vulnerableServers.length; index++) {
 		let server = vulnerableServers[index];
 		// For now, we're just going with the highest dollar amount :P
-		if (ns.getHackingLevel() >= ns.getServerRequiredHackingLevel(server)){
-			if(topTargets.length < 5 && !topTargets.includes(server)){
+		if (ns.getHackingLevel() >= ns.getServerRequiredHackingLevel(server)) {
+			if (topTargets.length < 5 && !topTargets.includes(server)) {
 				topTargets.push(server);
-			}else{
+			} else {
 				for (let i = 0; i < topTargets.length; i++) {
-					if(ns.getServerMaxMoney(topTargets[i]) < ns.getServerMaxMoney(server) && !topTargets.includes(server)){
+					if (ns.getServerMaxMoney(topTargets[i]) < ns.getServerMaxMoney(server) && !topTargets.includes(server)) {
 						topTargets[i] = server;
 						break;
 					}
@@ -218,10 +247,10 @@ export async function attackTopTargets(ns) {
 		ns.killall(server)
 		maxRam = ns.getServerMaxRam(server);
 		maxThreadCount = Math.floor(maxRam / threadCost);
-		if(maxThreadCount <= 0){
+		if (maxThreadCount <= 0) {
 			ns.print(`NOT ENOUGH resources on server: _${server}_ to run virus.`)
-		}else{
-			switch(topTargets.length){
+		} else {
+			switch (topTargets.length) {
 				case 5:
 					ns.exec(virus, server, maxThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
 					break;
@@ -234,10 +263,10 @@ export async function attackTopTargets(ns) {
 		}
 	}
 	let home = "home";
-	let homeThreadCount =  Math.floor((ns.getServerMaxRam(home) - ns.getServerUsedRam(home)) / threadCost);
+	let homeThreadCount = Math.floor((ns.getServerMaxRam(home) - ns.getServerUsedRam(home)) / threadCost);
 	// Start hacking script on home server too!
 
-	switch(topTargets.length){
+	switch (topTargets.length) {
 		case 5:
 			ns.exec(virus, "home", homeThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
 			break;
