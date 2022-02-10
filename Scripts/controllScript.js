@@ -1,15 +1,6 @@
 /**
  * TODO: Make this the ultimate controll script!
  * The goal of this script is to basically be a glorified events manager.
- * [] Should be capable of launching tasks (Executing scripts for designated tasks) and managing their state.
- * [x] Things like cracking servers (making them vulnerable w/ exploits):
- * - in loop that runs, say, every 10 seconds, check how many exploits we have.
- * 		- If the amount of exploits changes;
- * 			- re-run the script that cracks as many servers as possible
- * 			- Re-deploy weaken/grow/hack scripts to newly vulnerable servers
- * 			- Add the new servers to the 'availableBuckets' list to utalize as RAM for hacking.
- * 			- re-apply the hacking regimend! (Don't want to interrupt existing tasks, just assign updated new ones!)
- * 
  * [] Then the hackEventCoordinator should manage how we stagger out weaken, grow, and hack commands, 
  * and what vulnerable servers run how many of the threads for each distributed attack!
  * 
@@ -40,7 +31,7 @@ import {
 	weakenTime, growTime, hackTime,
 	growPercent, hackPercent
  } from "lib/formulasHackingFacade.js";
-
+var player;
 var serverMap;
 var controlCycle;
 // Servers to check through for value/hacking list
@@ -64,7 +55,8 @@ var lastAvailableExploitsCheck;
 //Player stats to listen to
 var hackingLvl;
 
-async function init() {
+async function init(ns) {
+	player = ns.getPlayer();
 	// If need be, could make an "Event" wrapper class that is the function, 
 	// UUID(name, effectively), and other useful vars for ordering.
 
@@ -72,8 +64,8 @@ async function init() {
 	// Can be inserted & removed as deemed necessary!
 
 	controlCycle = new Map();
-	controlCycle.set(EXPLOIT_CHECK, function () { exploitCheck(ns) });
-	controlCycle.set(LVL_UP_CHECK, function () { levelUpCheck(ns) });
+	controlCycle.set(EXPLOIT_CHECK, function (ns) { exploitCheck(ns) });
+	controlCycle.set(LVL_UP_CHECK, function (ns) { levelUpCheck(ns) });
 	// controlCycle.set() //Idk, X_PORT_LISTEN maybe? (I.E. for Node, when that is useful...)
 	// Additional EventQueue?
 	serverMap = new Map();
@@ -93,8 +85,8 @@ async function init() {
 }
 
 export async function main(ns) {
-	init();
-	await countExploits(ns);
+	init(ns);
+	countExploits(ns);
 
 	// Traversal should generate a list of all servers, ideally seperating them into hackable/notHackable
 	// Evaluating Servers & Cracking them!
@@ -103,16 +95,17 @@ export async function main(ns) {
 	let running = true;
 	while (running) {
 		for (let [key, value] of controlCycle.entries()) {
-			value();
+			// ns.print(`Key: ${key}, ${controlCycle.size}`)
+			value(ns);
 		}
-		ns.sleep(25);
+		await ns.sleep(2500);
 	}
 
 	// Determines which vulnerable servers are best to hack for $$$
-	await profileTargets(ns);
+	profileTargets(ns);
 	ns.print(`High profile targets selected: ${topTargets}`)
 	// Initiates attacks on top targets on compromised servers
-	await attackTopTargets(ns);
+	attackTopTargets(ns);
 
 	await ns.sleep(10000)
 }
@@ -122,16 +115,19 @@ export async function main(ns) {
 async function traverseServers(ns) {
 	// Run the initial scan
 	queuedServers = ns.scan();
+	ns.print(`Initial servers:${queuedServers}`)
 	let server;
 	while (queuedServers.length > 0) {
 		server = queuedServers.shift();
 		traversedServers.push(server);
+		ns.print(`Traversing server: ${server}`)
 
-		await processServer(ns, server)
+		processServer(ns, server)
 	}
 }
 
 async function levelUpCheck(ns) {
+	ns.print("Entered Level Up Check")
 	if (ns.getHackingLevel() !== hackingLvl) {
 		hackingLvl = ns.getHackingLevel();
 		// Checks if there are no un-hackable servers remaining, will remove this from controlCycle
@@ -145,7 +141,10 @@ async function levelUpCheck(ns) {
 		while (serverMap[notHackableServers[0]].getReqHackLvl() <= hackingLvl) {
 			server = notHackableServers.shift();
 			hackableServers.push(server);
+			
 		}
+		// sort after adding
+		sortHackableServers(ns);
 	}
 }
 
@@ -176,13 +175,15 @@ export async function countExploits(ns) {
 }
 
 async function exploitCheck(ns) {
+	ns.print("Entered Exploit Check")
 	if (exploits < 5 && (getTime() - lastAvailableExploitsCheck) > 10) {
-		let changed = await countExploits(ns);
+		let changed = countExploits(ns);
 		if (changed) {
 			crackExploitableServers(ns);
 		}
 	} else if (exploits === 5) {
 		controlCycle.delete(EXPLOIT_CHECK);
+		ns.print("Canceling Exploit Check Task")
 	}
 }
 
@@ -215,6 +216,7 @@ async function crackServer(ns, server, reqPorts) {
 
 // Used for initial traversal
 export async function processServer(ns, server) {
+	ns.print(`Processing Server: ${server}`)
 	let exploited = ns.hasRootAccess(server);
 	if (!exploited) {
 		let reqPorts = ns.getServerNumPortsRequired(server);
@@ -236,10 +238,11 @@ export async function processServer(ns, server) {
 	let subServers = ns.scan(server)
 	for (let index = 0; index < subServers.length; index++) {
 		let subServer = subServers[index];
-		if (!traversedServers.includes(subServer)) {
+		if (!traversedServers.includes(subServer) && !queuedServers.includes(subServer)) {
 			queuedServers.push(subServer)
 		}
 	}
+	ns.print(`${server}'s subservers: ${subServers}`)
 
 	// Split into hackable/notHackable groupings
 	let hackLvlReq = ns.getServerRequiredHackingLevel(server);
@@ -286,11 +289,6 @@ async function infectVulnerableServer(ns, server) {
 	await ns.scp(HACK, server);
 }
 
-import { 
-	weakenTime, growTime, hackTime,
-	growPercent, hackPercent
- } from "lib/formulasHackingFacade.js";
-// TODO: Determine highest value targetable server (Profile hacking targets)
 export async function profileTargets(ns) {
 	// TODO: What we REALLY want this function to do is SORT targets by value!
 	// topTargets should no longer exist once this is accomplished!
@@ -299,37 +297,29 @@ export async function profileTargets(ns) {
 	// - Probably with a datastructure capable of storing &
 	//	 sorting ServerNodes with it's own evaluation & comparison function
 
-	hackableServers.sort(function (serverA, serverB) {
-		// TODO: Determine value of each server
-		// Use time it would take to execute functions (add all together)
-		// Divide the amount you could extract per hack by the total time it takes to weaken it to min, grow to max, and hack.
-		// - For now, we'll just keep it simple and just do amount/hack_time
+	sortHackableServers(ns);
+	// Once sorted, we want to allocate the right order & correct amount of threads distributed accross servers.
+	// Then, once we have enough allocated to doing those three things (perhaps with a 2nd layer to buffer)
+	// we can move on to the next highest valued server to do the same thing, and so on...
+	// - To avoid having to re-allocate, we would be listening via ports for when they complete, so we know when we need to launch new tasks.
+	//  - OR scheduling them such that they are back to back always (second layer)
+}
+
+function sortHackableServers(ns){
+	hackableServers.sort(function (a, b) {
+		// Determines which server has a higher value based on amount possible to earn per second. ($/rate)
+		let serverA = ns.getServer(a);
+		let serverB = ns.getServer(b);
+
+		let hackValueA = hackPercent(serverA, player) * getServerMaxMoney(serverA, player);
+		let timeA = weakenTime(serverA, player) + growTime(serverA, player) + hackTime(serverA, player);
+		let hackValueB = hackPercent(serverB, player) * getServerMaxMoney(serverB, player);
+		let timeB = weakenTime(serverB, player) + growTime(serverB, player) + hackTime(serverB, player);
+
+		let serverAValue = hackValueA / timeA;
+		let serverBValue = hackValueB / timeB;
+		return serverAValue > serverBValue ? 1 : serverAValue < serverBValue ? -1 : 0;
 	});
-
-
-
-
-	for (let index = 0; index < hackableServers.length; index++) {
-		let server = hackableServers[index];
-		// For now, we're just going with the highest dollar amount :P
-		if (ns.getHackingLevel() >= ns.getServerRequiredHackingLevel(server)) {
-			if (topTargets.length < 5 && !topTargets.includes(server)) {
-				topTargets.push(server);
-			} else {
-				for (let i = 0; i < topTargets.length; i++) {
-					if (ns.getServerMaxMoney(topTargets[i]) < ns.getServerMaxMoney(server) && !topTargets.includes(server)) {
-						topTargets[i] = server;
-						break;
-					}
-				}
-			}
-		}
-	}
-	// let server = vulnerableServers[index];
-	// 	let maxMoney = ns.getServerMaxMoney(server);
-	// 	let hackSuccessChance = ns.hackSuccessChance(server);
-	// 	// let threadScale = threadsUsed
-	// 	let weakenTime = security/weakenProgress
 }
 
 export async function attackTopTargets(ns) {
