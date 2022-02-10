@@ -4,10 +4,6 @@ const RAM = 1;
 const CORE = 2;
 const HOME = "home";
 
-/**
- * A sloppily written but effective optimal Hacknet buying bot 
- */
-
 export async function main(ns) {
 	while (ns.hacknet.numNodes() < ns.hacknet.maxNumNodes()) {
 		let newNodeRatio = await calcNewNodeValueRatio(ns);
@@ -51,6 +47,7 @@ export async function main(ns) {
 
 		// Buys a new node or the best valued upgrade
 		let bal = ns.getServerMoneyAvailable(HOME);
+		// ns.print(`NewNodw:${newNodeRatio} > BestRatio:${bestRatio}`)
 		if (newNodeRatio > bestRatio) {
 			// Buy a new node!
 			ns.print("Trying to buy a new Node...")
@@ -145,6 +142,10 @@ export async function calcNewNodeValueRatio(ns) {
 		totalHacknetNodeProduction += ns.hacknet.getNodeStats(i).production;
 	}
 	let valueRatio = (totalHacknetNodeProduction / numberOfNodes) / ns.hacknet.getPurchaseNodeCost();
+	// ns.print(`valueRatio:${valueRatio}, totalProduction:${totalHacknetNodeProduction}, Node#${numberOfNodes}`)
+	if(isNaN(valueRatio)){
+		valueRatio = 1;
+	}
 	return valueRatio;
 }
 
