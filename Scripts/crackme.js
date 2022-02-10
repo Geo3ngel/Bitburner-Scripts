@@ -121,12 +121,12 @@ export async function profileTargets(ns) {
 	for (let index = 0; index < vulnerableServers.length; index++) {
 		let server = vulnerableServers[index];
 		// For now, we're just going with the highest dollar amount :P
-		if (ns.getHackingLevel() > ns.getServerRequiredHackingLevel(server)){
-			if(topTargets.length < 5){
+		if (ns.getHackingLevel() >= ns.getServerRequiredHackingLevel(server)){
+			if(topTargets.length < 5 && !topTargets.includes(server)){
 				topTargets.push(server);
 			}else{
 				for (let i = 0; i < topTargets.length; i++) {
-					if(ns.getServerMaxMoney(topTargets[i]) < ns.getServerMaxMoney(server)){
+					if(ns.getServerMaxMoney(topTargets[i]) < ns.getServerMaxMoney(server) && !topTargets.includes(server)){
 						topTargets[i] = server;
 						break;
 					}
@@ -149,6 +149,8 @@ export async function attackTopTargets(ns) {
 	let server;
 	let maxRam;
 	let maxThreadCount;
+	ns.print(`Top Targets: ${topTargets}`)
+	await ns.sleep(10000)
 	for (let index = 0; index < vulnerableServers.length; index++) {
 		// const maxThreads = Math.floor(maxRam / threadCost);
 		server = vulnerableServers[index];
@@ -158,11 +160,31 @@ export async function attackTopTargets(ns) {
 		if(maxThreadCount <= 0){
 			ns.print(`NOT ENOUGH resources on server: _${server}_ to run virus.`)
 		}else{
-			ns.exec(virus, server, maxThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
+			switch(topTargets.length){
+				case 5:
+					ns.exec(virus, server, maxThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
+					break;
+				case 3:
+					ns.exec(virus, server, maxThreadCount, topTargets[0], topTargets[1], topTargets[2]);
+					break;
+				default:
+					ns.print(`Not enough topTagets: ${topTargets.length}`)
+			}
 		}
 	}
 	let home = "home";
 	let homeThreadCount =  Math.floor((ns.getServerMaxRam(home) - ns.getServerUsedRam(home)) / threadCost);
 	// Start hacking script on home server too!
-	ns.exec(virus, "home", homeThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
+
+	switch(topTargets.length){
+		case 5:
+			ns.exec(virus, "home", homeThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
+			break;
+		case 3:
+			ns.exec(virus, "home", homeThreadCount, topTargets[0], topTargets[1], topTargets[2]);
+			break;
+		default:
+			ns.print(`Not enough topTagets: ${topTargets.length}`)
+	}
+	// ns.exec(virus, "home", homeThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
 }
