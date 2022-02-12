@@ -31,7 +31,7 @@ import {
 	weakenTime, growTime, hackTime,
 	growPercent, hackPercent
 } from "lib/formulasHackingFacade.js";
-import Bucket from "lib/Bucket.js";
+// import Bucket from "lib/Bucket.js";
 var player;
 var serverMap;
 var controlCycle;
@@ -49,14 +49,17 @@ let traversedServers;
 // Function labels for control cycle
 const EXPLOIT_CHECK = 0;
 const LVL_UP_CHECK = 1;
+const PRIME_ATTACK = 2;
 
 // Timers
 var lastAvailableExploitsCheck;
 
 //Player stats to listen to
 var hackingLvl;
+var ns2;
 
 async function init(ns) {
+	ns2 = ns;
 	player = ns.getPlayer();
 	// If need be, could make an "Event" wrapper class that is the function, 
 	// UUID(name, effectively), and other useful vars for ordering.
@@ -67,6 +70,8 @@ async function init(ns) {
 	controlCycle = new Map();
 	controlCycle.set(EXPLOIT_CHECK, function (ns) { exploitCheck(ns) });
 	controlCycle.set(LVL_UP_CHECK, function (ns) { levelUpCheck(ns) });
+	// controlCycle.set(EVALUATE_TARGETS, function (ns) { primeHackableServers(ns) });
+	controlCycle.set(PRIME_ATTACK, function (ns) { multiStaggeredHack(ns) });
 	// controlCycle.set() //Idk, X_PORT_LISTEN maybe? (I.E. for Node, when that is useful...)
 	// Additional EventQueue?
 	serverMap = new Map();
@@ -92,6 +97,9 @@ export async function main(ns) {
 	// Traversal should generate a list of all servers, ideally seperating them into hackable/notHackable
 	// Evaluating Servers & Cracking them!
 	traverseServers(ns);
+	ns.print(`Servers: ${vulnerableServers}`)
+	// await ns.sleep(10000)
+	await ns.exec("infect.js", HOME, 1);
 
 	let running = true;
 	while (running) {
@@ -99,14 +107,8 @@ export async function main(ns) {
 			// ns.print(`Key: ${key}, ${controlCycle.size}`)
 			value(ns);
 		}
-		await ns.sleep(2500);
+		await ns.sleep(1000);
 	}
-
-	// Determines which vulnerable servers are best to hack for $$$
-	profileTargets(ns);
-	ns.print(`High profile targets selected: ${topTargets}`)
-	// Initiates attacks on top targets on compromised servers
-	attackTopTargets(ns);
 
 	await ns.sleep(10000)
 }
@@ -116,12 +118,12 @@ export async function main(ns) {
 async function traverseServers(ns) {
 	// Run the initial scan
 	queuedServers = ns.scan();
-	ns.print(`Initial servers:${queuedServers}`)
+	// ns.print(`Initial servers:${queuedServers}`)
 	let server;
 	while (queuedServers.length > 0) {
 		server = queuedServers.shift();
 		traversedServers.push(server);
-		ns.print(`Traversing server: ${server}`)
+		// ns.print(`Traversing server: ${server}`)
 
 		processServer(ns, server)
 	}
@@ -146,7 +148,31 @@ async function levelUpCheck(ns) {
 		}
 		// sort after adding
 		sortHackableServers(ns);
+		// TODO: Pick top X servers to put in event queue for Priming/Attacking
+		// - Priming & attack bits should target the top X positions!
+		// - Create them based on number of available hackable servers.
 	}
+}
+
+async function multiStaggeredHack(ns) {
+	// Determines which vulnerable servers are best to hack for $$$
+	profileTargets(ns);
+	ns.print(`Entering Stagger Attack: ${hackableServers}`);
+	let topN = 5; // Maybe tweak this value later
+	for (let i = 0; i < topN; i++) {
+		let server = hackableServers[i]
+		ns.print(`Checking: ${i}, ${server}`)
+		if (isPrimed(ns, server)) {
+			attackTarget(ns, server);
+		} else {
+			primeServer(ns, server);
+		}
+	}
+}
+
+// Kicks off the initial round of priming servers!
+async function primeHackableServers(ns) {
+
 }
 
 export async function countExploits(ns) {
@@ -193,7 +219,6 @@ async function crackExploitableServers(ns) {
 	while (exploits >= serversToExploit.front().getExploitsReq()) {
 		server = serversToExploit.dequeue();
 		crackServer(ns, server.getName(), server.getExploitsReq);
-		infectVulnerableServer(ns, server);
 		vulnerableServers.push(server);
 		serverMap[server].setExploited();
 	}
@@ -249,7 +274,7 @@ export async function processServer(ns, server) {
 	// Split into hackable/notHackable groupings
 	let hackLvlReq = ns.getServerRequiredHackingLevel(server);
 	let maxRam = ns.getServerMaxRam(server);
-	isHackable();
+	isHackable(ns, server);
 	let traversed = true;
 	// TODO: hasCCT check?
 	let hasCCT = false;
@@ -257,7 +282,7 @@ export async function processServer(ns, server) {
 	map.set(server, new ServerNode(server, reqPorts, hackLvlReq, exploited, maxRam, traversed, hasCCT, subServers));
 }
 
-async function isHackable(server) {
+async function isHackable(ns, server) {
 	let reqHackingLvl = ns.getServerRequiredHackingLevel(server);
 	if (ns.getHackingLevel() >= reqHackingLvl) {
 		hackableServers.push(server);
@@ -266,12 +291,6 @@ async function isHackable(server) {
 		notHackableServers.enqueue(server, reqHackingLvl);
 	}
 	return false;
-}
-
-async function infectVulnerableServer(ns, server) {
-	await ns.scp(WEAKEN, server);
-	await ns.scp(GROW, server);
-	await ns.scp(HACK, server);
 }
 
 export async function profileTargets(ns) {
@@ -303,59 +322,17 @@ function sortHackableServers(ns) {
 
 		let serverAValue = hackValueA / timeA;
 		let serverBValue = hackValueB / timeB;
-		return serverAValue > serverBValue ? 1 : serverAValue < serverBValue ? -1 : 0;
+		return serverAValue < serverBValue ? 1 : serverAValue > serverBValue ? -1 : 0;
 	});
 }
 
-export async function attackTopTargets(ns) {
-	// Iterate through list of servers, Exec-ing the virus script w/ the top targets as input for arguments.
-	// The tricky bit here will be determining max amount of threads to run the virus with
-	// for (let index = 0; index < topTargets.length; index++) {
-	let threadCost = ns.getScriptRam(VIRUS);
-	let server;
-	let maxRam;
-	let maxThreadCount;
-	ns.print(`Top Targets: ${topTargets}`)
-	await ns.sleep(10000)
-	for (let index = 0; index < vulnerableServers.length; index++) {
-		// const maxThreads = Math.floor(maxRam / threadCost);
-		server = vulnerableServers[index];
-		ns.killall(server)
-		maxRam = ns.getServerMaxRam(server);
-		maxThreadCount = Math.floor(maxRam / threadCost);
-		if (maxThreadCount <= 0) {
-			ns.print(`NOT ENOUGH resources on server: _${server}_ to run virus.`)
-		} else {
-			switch (topTargets.length) {
-				case 5:
-					ns.exec(VIRUS, server, maxThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
-					break;
-				case 3:
-					ns.exec(VIRUS, server, maxThreadCount, topTargets[0], topTargets[1], topTargets[2]);
-					break;
-				default:
-					ns.print(`Not enough topTagets: ${topTargets.length}`)
-			}
-		}
-	}
-	let homeThreadCount = Math.floor((ns.getServerMaxRam(HOME) - ns.getServerUsedRam(HOME)) / threadCost);
-	// Start hacking script on home server too!
-
-	switch (topTargets.length) {
-		case 5:
-			ns.exec(VIRUS, HOME, homeThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
-			break;
-		case 3:
-			ns.exec(VIRUS, HOME, homeThreadCount, topTargets[0], topTargets[1], topTargets[2]);
-			break;
-		default:
-			ns.print(`Not enough topTagets: ${topTargets.length}`)
-	}
-	// ns.exec(virus, "home", homeThreadCount, topTargets[0], topTargets[1], topTargets[2], topTargets[3], topTargets[4]);
+async function isPrimed(ns, server) {
+	let availalbeMoney = ns.getServerMoneyAvailable(server);
+	let maxMoney = ns.getServerMaxMoney(server);
+	let securityLvl = ns.getServerSecurityLevel(server);
+	let minSecurity = ns.getServerMinSecurityLevel(server);
+	return (availalbeMoney >= maxMoney) && (securityLvl <= minSecurity);
 }
-
-// TODO: Figure out base strategy for defining threads & timing needed to run a cycle.
-// TODO: Then split those threads amongst various `bucket servers` and ensure the timing lines up
 // Could also use ports to ensure things are synced up via comm channels, but not sure if that would add to RAM usage..
 // It does not! Wow. I'll totally just do that then, that seems way easier than guessing timings!
 // Say port 1 is for weaken comms, 2 is for growth, and 3 is for hacking!
@@ -363,16 +340,8 @@ async function primeServer(ns, server) {
 	/**
 	 * PRIMING server.
 	 * Growing to max, and weakening to min
-	 * TODO: Consider making this it's own script, much like the individual Weakening/Growing/Hacking scripts!
-	 * - or it's own `event` function.
-	 * - should be able to be distributed over multiple servers
-	 * - could use port for callback to tell the controlCycle when it is ready to move onto HACK phase!
 	 */
-	// TODO: Implement bucket selection for bucket server(s). This determines how the threads should be spread out
-	// and how many/what servers, or 'buckets', the current task can fit into!
-	var bucketServer = "";
-	// When using server's Ram for calculations, always subtract the script being run first!
-	// TODO: Intelligently calc this within the serverNode itself! (Or keep track of it there!)
+	ns.print(`PRIMING ${server}`);
 	let _server = ns.getServer(server);
 	var maxRam = (ns.getServerMaxRam(server) - ns.getScriptRam(WEAKEN));
 
@@ -385,8 +354,10 @@ async function primeServer(ns, server) {
 	let availalbeMoney = ns.getServerMoneyAvailable(server);
 	if (availalbeMoney < maxMoney) {
 		// Grow money
-		ns.exec(WEAKEN, bucketServer, weakenThreads, server, 0);
-		ns.exec(GROW, bucketServer, maxGrowThreads, server, 0);
+		distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 0);
+		distributeAttackLoad(ns, server, Grow, weakenThreads, 50);
+		// ns.exec(WEAKEN, bucketServer, weakenThreads, server, 0);
+		// ns.exec(GROW, bucketServer, maxGrowThreads, server, 0);
 		await ns.sleep(weakenTime(_server, player) + sleepBuffer);
 	}
 
@@ -394,53 +365,87 @@ async function primeServer(ns, server) {
 	let securityLvl = ns.getServerSecurityLevel(server);
 	if (securityLvl > minSecurity) {
 		// Weaken Security
-		ns.exec(WEAKEN, bucketServer, weakenThreads, server, 0);
+		// ns.exec(WEAKEN, bucketServer, weakenThreads, server, 0);
+		distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 100);
 		await ns.sleep(weakenTime(_server, player) + sleepBuffer);
 	}
 
 	/**
 	 * Server is PRIMED
 	 */
+}
 
+async function attackTarget(ns, server) {
+	/** 
+	 * All of this should be seperated out into a seperate ATTACK portion!
+	 * So it can easily be looped.
+	 * Ideally what I should do for the first round is say, choose the top 5 valued servers
+	 * - Focus on priming them as fast as possible
+	 * Then move into the next stage for them, which would be the ATTACK phase!
+	 * - Attack phase could even be thought of as a unique EVENT in the EVENT_CYCLE that gets added once it is PRIMED
+	 * - Then we remove the PRIME EVENT from the EVENT_CYCLE
+	 */
 
+	let _server = ns.getServer(server);
 	// PRINCIPLE: Make all calculations in real time! (Don't store the values!)
 	// Should make functions for more complex vars. I.E. threadCounts for grow, weaken, hack.
 	// Should give the amount of threads needed to grow by 200%
-	var growThreads = Math.ceil(((5 / (growPercent(server, 1, player, 1) - 1))));
+	var growThreads = Math.ceil(((5 / (growPercent(_server, 1, player, 1) - 1))));
 	// Should use this amount once determined to split growth across bucket servers
-	var hackThreads = threadsToHackPercent(server, .5);  //Getting the amount of threads I need to hack 50% of the funds
+	var hackThreads = threadsToHackPercent(_server, .5);  //Getting the amount of threads I need to hack 50% of the funds
 	// TODO: Double check this calculation. It looks horrendously wrong
+	var weakenThreads = (2000 - ((ns.getServerMinSecurityLevel(server)) / 0.05));
 	weakenThreads = Math.ceil((weakenThreads - (growThreads * 0.004))); //Getting required threads to fully weaken the server
 
 	// TODO: Use calculated thread counts & timing to do segmented hack!
 	// TODO: Split out bit that isn't related to getting the server to max/min state to it's own function!
-
+	ns.print(`Attacking: ${server}`)
+	distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 0);
+	distributeAttackLoad(ns, server, GROW, growThreads, 50);
+	distributeAttackLoad(ns, server, HACK, hackThreads, 100);
 }
 
-async function distribute2(script, totalThreads, delay) {
+async function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { // Consider doing delays by time stamp?
 	let scriptRam = ns.getScriptRam(script);
-	// Attempting without thinking of things as 'Bucket objects'.
+	let host;
+	let ram;
+	let threads;
+	ns.print(`Distributed ${script} attack for ${targetServer}`)
 	// Sorted list of vulnerable servers by available free RAM
+	sortVulnerableServersByFreeRam(ns);
+	for (let i = 0; i < vulnerableServers.length; i++) {
+		// figure out how many threads we can run of our script on the given server
+		host = vulnerableServers[i];
+		ram = ns.getServerRam(host);
+		threads = Math.floor((ram[0] - ram[1]) / scriptRam);
+		if (threads > 0) {
+			// Subtract threads from totalThreads value!
+			totalThreads -= threads;
+			ns.exec(script, host, threads, targetServer, delay);
+		} else {
+			// Not enough threads to continue attacking target...
+			// This will defaintely throw off the timing, so I do need some kind of schedule manager for timing attacks
+			break;
+		}
+		if (totalThreads <= 0) {
+			return; // Done distributing the attack load!
+		}
+	}
+
+	// TODO: Queue EVENT for this!
+	// TODO: Remove EVENT for this!
+}
+
+// TODO: EVENT for determining current set of targets!
+// - Prep server
+
+async function sortVulnerableServersByFreeRam(ns) {
 	vulnerableServers.sort(function (a, b) {
-		// TODO: IF I do decide to set reserved Ram in the serverNode, will need to account for reserved Ram value in these calcs!
-		let serverAFreeRam = ns.getServerMaxRam(a) - ns.getServerUsedRam(a); // - serverMap[a].getReservedRam();
+		let serverAFreeRam = ns.getServerMaxRam(a) - ns.getServerUsedRam(a);
 		let serverBFreeRam = ns.getServerMaxRam(b) - ns.getServerUsedRam(b);
 		return serverAFreeRam < serverBFreeRam ? 1 : serverAFreeRam > serverBFreeRam ? -1 : 0;
 	});
-
-	// Calc how manny threads of this script (use baseRam) can fit in X server?
-	// figure out how many threads we can run of our script
-	ram = getServerRam(servers[i]);
-	threads = Math.floor((ram[0] - ram[1]) / scriptRam); // + serverMap[a].getReservedRam();
-	if (threads > 0) {
-		// Subtract threads from totalThreads value!
-		totalThreads -= threads;
-		// TODO: Exec for this server! Or mark it for execution and reserve the ram it will use!
-		ns.exec()
-	}
-
 }
-
 
 async function distribute(totalThreads, baseRam) {
 	buckets = [];
