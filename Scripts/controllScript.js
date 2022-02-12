@@ -31,6 +31,7 @@ import {
 	weakenTime, growTime, hackTime,
 	growPercent, hackPercent
 } from "lib/formulasHackingFacade.js";
+import Bucket from "lib/Bucket.js";
 var player;
 var serverMap;
 var controlCycle;
@@ -194,6 +195,7 @@ async function crackExploitableServers(ns) {
 		crackServer(ns, server.getName(), server.getExploitsReq);
 		infectVulnerableServer(ns, server);
 		vulnerableServers.push(server);
+		serverMap[server].setExploited();
 	}
 }
 
@@ -357,7 +359,7 @@ export async function attackTopTargets(ns) {
 // Could also use ports to ensure things are synced up via comm channels, but not sure if that would add to RAM usage..
 // It does not! Wow. I'll totally just do that then, that seems way easier than guessing timings!
 // Say port 1 is for weaken comms, 2 is for growth, and 3 is for hacking!
-function primeServer(ns, server) {
+async function primeServer(ns, server) {
 	/**
 	 * PRIMING server.
 	 * Growing to max, and weakening to min
@@ -415,19 +417,65 @@ function primeServer(ns, server) {
 
 }
 
-function distribute(totalThreads, baseRam) {
+async function distribute2(script, totalThreads, delay) {
+	let scriptRam = ns.getScriptRam(script);
+	// Attempting without thinking of things as 'Bucket objects'.
+	// Sorted list of vulnerable servers by available free RAM
+	vulnerableServers.sort(function (a, b) {
+		// TODO: IF I do decide to set reserved Ram in the serverNode, will need to account for reserved Ram value in these calcs!
+		let serverAFreeRam = ns.getServerMaxRam(a) - ns.getServerUsedRam(a); // - serverMap[a].getReservedRam();
+		let serverBFreeRam = ns.getServerMaxRam(b) - ns.getServerUsedRam(b);
+		return serverAFreeRam < serverBFreeRam ? 1 : serverAFreeRam > serverBFreeRam ? -1 : 0;
+	});
+
+	// Calc how manny threads of this script (use baseRam) can fit in X server?
+	// figure out how many threads we can run of our script
+	ram = getServerRam(servers[i]);
+	threads = Math.floor((ram[0] - ram[1]) / scriptRam); // + serverMap[a].getReservedRam();
+	if (threads > 0) {
+		// Subtract threads from totalThreads value!
+		totalThreads -= threads;
+		// TODO: Exec for this server! Or mark it for execution and reserve the ram it will use!
+		ns.exec()
+	}
+
+}
+
+
+async function distribute(totalThreads, baseRam) {
 	buckets = [];
 	// TODO: Iterate through vulnerable serverNodes, creating a 'bucket' for each one
 	// TODO: Figure out calculation to determine how many threads can fit on each server!
 	for (let [key, value] of serverMap.entries()) {
 		if (value.isExploited()) {
 			// Vulnerable serverNode.
-			// TODO: mark the serverNode's resources as used (calc ram usage & set it?)
+			// Calc how manny threads can be run on this server!
+			let threads = 0;
+			let resourcesToUse = 0;
+			// TODO: Reserve serverNode's resources (calc ram usage & set it?)
 			// 	- might want to set up serverNode resource w/ bucket UUID, such that once the bucket task is complete,
 			//    and being removed, it can clear the reserved RAM from the serverNode.
+			if (fits) {
+				value.reserveRam(resourcesToUse);
+				// Will need to free ram when either:
+				// - Ceasing Priming for a server
+				// - Changing targeted server priority (deciding to target another server)
+				buckets.push(new Bucket(value, threads));
+			}
+			// Q. How to free ram once the task is completed?
+			// 		wait, don't we only actually need to free the reserved RAM once we execute the script!
+			// 		Otherwise we can just check that server's free RAM!
 		}
 	}
 	return buckets; // Buckets can then be iterated through to issue executes on the correct targets w/ appropriate threading!
+}
+
+async function doesScriptFitOnServer(script, server, threads) {
+	// use script & threads to calc the RAM that will be taken up.
+	// Check current Reserved RAM to see if that would be an issue
+
+	//Calculating how much RAM is used for a single run
+	var totalRamForRun = (hackscriptRam * hackThreads) + (growscriptRam * growThreads) + (weakenscriptRam * weakenThreads)
 }
 
 // Returns the amount of threads needed to hack X% of a server's money. (Enter percent as float)
