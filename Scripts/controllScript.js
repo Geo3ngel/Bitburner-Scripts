@@ -162,11 +162,13 @@ async function multiStaggeredHack(ns) {
 		let server = hackableServers[i]
 		ns.print(`Checking: ${i}, ${server}`)
 		if (isPrimed(ns, server)) {
-			attackTarget(ns, server);
-			primeServer(ns, server);
+			attackPrime(ns, server);
+		} else if (serverMap[server].isPriming()) {
+			// Start setting up attack threads instead!
+			// Priming threads have alread been initiated!
+			attackPrime(ns, server);
 		} else {
 			primeServer(ns, server);
-			attackTarget(ns, server);
 		}
 	}
 }
@@ -299,8 +301,8 @@ function sortHackableServers(ns) {
 
 
 		// let _server = ns.getServer(server);
-		let serverAValue = ns.getServerMaxMoney(a)/hackTime(serverA, player);
-		let serverBValue = ns.getServerMaxMoney(b)/hackTime(serverB, player);
+		let serverAValue = ns.getServerMaxMoney(a) / hackTime(serverA, player);
+		let serverBValue = ns.getServerMaxMoney(b) / hackTime(serverB, player);
 		return serverAValue < serverBValue ? 1 : serverAValue > serverBValue ? -1 : 0;
 	});
 }
@@ -326,23 +328,68 @@ async function primeServer(ns, server) {
 	let cores = ns.getServer(HOME).cpuCores;
 	let neededGrowthPercent = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
 	let maxGrowThreads = Math.ceil(neededGrowthPercent / growPercent(_server, 1, player, cores));
+	var weakenThreads = ((ns.getServerSecurityLevel - ns.getServerMinSecurityLevel) + (maxGrowThreads * 0.004)) / 0.05
+	let timeToGrow = growTime(_server, player);
+	let timeToWeaken = weakenTime(_server, player);
+	// Sets timer delay to ensure weaken is completed only AFTER grow finishes.
+	let weakenDelayTime = timeToGrow - timeToWeaken;
+	if (weakenDelayTime < 0) { weakenDelayTime = 0; }
 
 	let maxMoney = ns.getServerMaxMoney(server);
 	let availalbeMoney = ns.getServerMoneyAvailable(server);
 	if (availalbeMoney < maxMoney) {
 		// Grow money
-		distributeAttackLoad(ns, server, GROW, maxGrowThreads, 100);
+		distributeAttackLoad(ns, server, GROW, maxGrowThreads, 0);
 	}
 
 	let minSecurity = ns.getServerMinSecurityLevel(server);
 	let securityLvl = ns.getServerSecurityLevel(server);
-	var weakenThreads = ((ns.getServerSecurityLevel - ns.getServerMinSecurityLevel) + (maxGrowThreads * 0.004)) / 0.05
 	if (securityLvl > minSecurity) {
-		distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 50);
+		distributeAttackLoad(ns, server, WEAKEN, weakenThreads, weakenDelayTime);
 	}
 	/**
-	 * Server is PRIMED
+	 * Server is PRIMING
+	 * - Mark the serverNode as PRIMING, and set the timestamp/time it will take for weakening+delay to complete!
 	 */
+	serverMap[server].setPriming(timeToWeaken + weakenDelayTime);
+}
+
+async function attackPrime(ns, server) {
+	let _server = ns.getServer(server);
+	let cores = ns.getServer(HOME).cpuCores;
+	// Should give the amount of threads needed to grow by 200%
+	// I could solve for threads from the EQ: 2.00 = growPercent^threads
+	// var growThreads = Math.ceil(((5 / (growPercent(_server, 1, player, cores) - 1))));
+	let gPercent = growPercent(_server, 1, player, cores);
+	// Should be the correct equation for calulating growth threads needed to double the server's money
+	var growThreads = Math.ceil(Math.log2(2) / Math.log2(gPercent));
+	var hackThreads = threadsToHackPercent(_server, 50);  //Getting the amount of threads I need to hack 50% of the funds
+	// var weakenThreads = (growThreads - ((ns.getServerMinSecurityLevel(server)) / 0.05));
+	//  (HackThreads * 0.002 + WeakenThreads * 0.004) / 0.053125
+	// weakenThreads = Math.ceil((weakenThreads - (growThreads * 0.004))); //Getting required threads to fully weaken the server
+	var weakenThreads = Math.ceil((hackThreads * 0.002 + growThreads * 0.004) / 0.05);
+
+	ns.print(`ATTACKING: ${server} w/ ${hackThreads} hack threads`)
+	distributeAttackLoad(ns, server, HACK, hackThreads, 0);
+	/**
+	 * PRIMING server.
+	 * Regrow what will be lost from the hack, and weaken what would be strengthened.
+	 * Calculate timing adjustments:
+	 */
+	let timeToHack = hackTime(_server, player);
+	let timeToGrow = growTime(_server, player);
+	let timeToWeaken = weakenTime(_server, player);
+	let growDelay = 0;
+	let weakenDelay = 0;
+	if (timeToHack > timeToGrow) {
+		growDelay = timeToHack - timeToGrow;
+	}
+	if (timeToGrow + growDelay > timeToWeaken) {
+		weakenDelay = timeToGrow + growDelay - weakenDelay;
+	}
+
+	distributeAttackLoad(ns, server, GROW, growThreads, growDelay);
+	distributeAttackLoad(ns, server, WEAKEN, weakenThreads, weakenDelay);
 }
 
 async function attackTarget(ns, server) {
