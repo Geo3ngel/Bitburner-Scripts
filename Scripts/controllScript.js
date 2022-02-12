@@ -163,8 +163,10 @@ async function multiStaggeredHack(ns) {
 		ns.print(`Checking: ${i}, ${server}`)
 		if (isPrimed(ns, server)) {
 			attackTarget(ns, server);
+			primeServer(ns, server);
 		} else {
 			primeServer(ns, server);
+			attackTarget(ns, server);
 		}
 	}
 }
@@ -264,7 +266,7 @@ export async function processServer(ns, server) {
 			queuedServers.push(subServer)
 		}
 	}
-	ns.print(`${server}'s subservers: ${subServers}`)
+	// ns.print(`${server}'s subservers: ${subServers}`)
 
 	// Split into hackable/notHackable groupings
 	let hackLvlReq = ns.getServerRequiredHackingLevel(server);
@@ -324,20 +326,19 @@ async function primeServer(ns, server) {
 	let cores = ns.getServer(HOME).cpuCores;
 	let neededGrowthPercent = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
 	let maxGrowThreads = Math.ceil(neededGrowthPercent / growPercent(_server, 1, player, cores));
-	// var maxGrowThreads = ((maxRam / ns.getScriptRam(GROW)) - (ns.getScriptRam(WEAKEN) * 2000));
-	var weakenThreads = ((ns.getServerSecurityLevel - ns.getServerMinSecurityLevel) + (maxGrowThreads * 0.004)) / 0.05
-
-	let minSecurity = ns.getServerMinSecurityLevel(server);
-	let securityLvl = ns.getServerSecurityLevel(server);
-	if (securityLvl > minSecurity) {
-		distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 100);
-	}
 
 	let maxMoney = ns.getServerMaxMoney(server);
 	let availalbeMoney = ns.getServerMoneyAvailable(server);
 	if (availalbeMoney < maxMoney) {
 		// Grow money
-		distributeAttackLoad(ns, server, GROW, maxGrowThreads, 50);
+		distributeAttackLoad(ns, server, GROW, maxGrowThreads, 100);
+	}
+
+	let minSecurity = ns.getServerMinSecurityLevel(server);
+	let securityLvl = ns.getServerSecurityLevel(server);
+	var weakenThreads = ((ns.getServerSecurityLevel - ns.getServerMinSecurityLevel) + (maxGrowThreads * 0.004)) / 0.05
+	if (securityLvl > minSecurity) {
+		distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 50);
 	}
 	/**
 	 * Server is PRIMED
@@ -350,14 +351,16 @@ async function attackTarget(ns, server) {
 	var growThreads = Math.ceil(((5 / (growPercent(_server, 1, player, 1) - 1))));
 	// Should use this amount once determined to split growth across bucket servers
 	var hackThreads = threadsToHackPercent(_server, 50);  //Getting the amount of threads I need to hack 50% of the funds
-	// TODO: Double check this calculation. It looks horrendously wrong
 	var weakenThreads = (2000 - ((ns.getServerMinSecurityLevel(server)) / 0.05));
 	weakenThreads = Math.ceil((weakenThreads - (growThreads * 0.004))); //Getting required threads to fully weaken the server
 
 	ns.print(`ATTACKING: ${server} w/ ${hackThreads} hack threads`)
 	distributeAttackLoad(ns, server, HACK, hackThreads, 0);
-	distributeAttackLoad(ns, server, GROW, growThreads, 50);
-	distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 100);
+	/**
+	 * RE-PRIME
+	 */
+	// distributeAttackLoad(ns, server, GROW, growThreads, 50);
+	// distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 100);
 }
 
 function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { // Consider doing delays by time stamp?
@@ -366,8 +369,6 @@ function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { /
 	let ram;
 	let threads;
 	ns.print(`Distributed ${script} attack for ${targetServer}`)
-	// Sorted list of vulnerable servers by available free RAM
-	// sortVulnerableServersByFreeRam(ns);
 	for (let i = 0; i < vulnerableServers.length; i++) {
 		// figure out how many threads we can run of our script on the given server
 		host = vulnerableServers[i];
@@ -379,16 +380,17 @@ function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { /
 				// Limit to only the needed amount!
 				threads = totalThreads;
 			}
-			ns.print(`Distributing ${threads} threads to ${host}`)
+			// ns.print(`Distributing ${threads} threads to ${host}`)
 			totalThreads -= threads;
 			ns.exec(script, host, threads, targetServer, delay);
 		}
 		if (totalThreads <= 0) {
-			ns.print(`Distributed ${script} attack for ${targetServer} to: ${host}: COMPETED ALL THREADS! ${totalThreads}`)
+			// ns.print(`Distributed ${script} attack for ${targetServer} to: ${host}: COMPETED ALL THREADS! ${totalThreads}`)
 			return; // Done distributing the attack load!
-		} else {
-			ns.print(`Distributed ${script} attack threads remaining: ${totalThreads}`)
 		}
+		// else {
+		// 	ns.print(`Distributed ${script} attack threads remaining: ${totalThreads}`)
+		// }
 	}
 }
 
