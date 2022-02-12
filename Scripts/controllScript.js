@@ -162,11 +162,11 @@ async function multiStaggeredHack(ns) {
 		let server = hackableServers[i]
 		ns.print(`Checking: ${i}, ${server}`)
 		if (isPrimed(ns, server)) {
-			attackPrime(ns, server);
+			attackServer(ns, server);
 		} else if (serverMap[server].isPriming()) {
 			// Start setting up attack threads instead!
 			// Priming threads have alread been initiated!
-			attackPrime(ns, server);
+			attackServer(ns, server);
 		} else {
 			primeServer(ns, server);
 		}
@@ -354,7 +354,7 @@ async function primeServer(ns, server) {
 	serverMap[server].setPriming(timeToWeaken + weakenDelayTime);
 }
 
-async function attackPrime(ns, server) {
+async function attackServer(ns, server) {
 	let _server = ns.getServer(server);
 	let cores = ns.getServer(HOME).cpuCores;
 	// Should give the amount of threads needed to grow by 200%
@@ -390,24 +390,6 @@ async function attackPrime(ns, server) {
 
 	distributeAttackLoad(ns, server, GROW, growThreads, growDelay);
 	distributeAttackLoad(ns, server, WEAKEN, weakenThreads, weakenDelay);
-}
-
-async function attackTarget(ns, server) {
-	let _server = ns.getServer(server);
-	// Should give the amount of threads needed to grow by 200%
-	var growThreads = Math.ceil(((5 / (growPercent(_server, 1, player, 1) - 1))));
-	// Should use this amount once determined to split growth across bucket servers
-	var hackThreads = threadsToHackPercent(_server, 50);  //Getting the amount of threads I need to hack 50% of the funds
-	var weakenThreads = (2000 - ((ns.getServerMinSecurityLevel(server)) / 0.05));
-	weakenThreads = Math.ceil((weakenThreads - (growThreads * 0.004))); //Getting required threads to fully weaken the server
-
-	ns.print(`ATTACKING: ${server} w/ ${hackThreads} hack threads`)
-	distributeAttackLoad(ns, server, HACK, hackThreads, 0);
-	/**
-	 * RE-PRIME
-	 */
-	// distributeAttackLoad(ns, server, GROW, growThreads, 50);
-	// distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 100);
 }
 
 function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { // Consider doing delays by time stamp?
