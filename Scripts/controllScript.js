@@ -155,7 +155,7 @@ async function levelUpCheck(ns) {
 
 async function multiStaggeredHack(ns) {
 	// Determines which vulnerable servers are best to hack for $$$
-	profileTargets(ns);
+	sortHackableServers(ns);
 	ns.print(`Entering Stagger Attack: ${hackableServers}`);
 	let topN = 5; // Maybe tweak this value later
 	for (let i = 0; i < topN; i++) {
@@ -286,22 +286,6 @@ async function isHackable(ns, server) {
 		notHackableServers.enqueue(server, reqHackingLvl);
 	}
 	return false;
-}
-
-export async function profileTargets(ns) {
-	// TODO: What we REALLY want this function to do is SORT targets by value!
-	// topTargets should no longer exist once this is accomplished!
-	// Q1. How to establish server value
-	// Q2. How to initially sort, and then maintain the sorted list?
-	// - Probably with a datastructure capable of storing &
-	//	 sorting ServerNodes with it's own evaluation & comparison function
-
-	sortHackableServers(ns);
-	// Once sorted, we want to allocate the right order & correct amount of threads distributed accross servers.
-	// Then, once we have enough allocated to doing those three things (perhaps with a 2nd layer to buffer)
-	// we can move on to the next highest valued server to do the same thing, and so on...
-	// - To avoid having to re-allocate, we would be listening via ports for when they complete, so we know when we need to launch new tasks.
-	//  - OR scheduling them such that they are back to back always (second layer)
 }
 
 // Util function
