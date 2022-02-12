@@ -306,41 +306,15 @@ export async function profileTargets(ns) {
 
 // Util function
 function sortHackableServers(ns) {
-	// TODO: Multiply time by needed threads to get from current price to max!
-	/**
-	 * let _server = ns.getServer(server);
-	let cores = ns.getServer(HOME).cpuCores;
-	let neededGrowthPercent = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
-	let maxGrowThreads = Math.ceil(neededGrowthPercent/growPercent(_server, 1, player, cores));
-	// var maxGrowThreads = ((maxRam / ns.getScriptRam(GROW)) - (ns.getScriptRam(WEAKEN) * 2000));
-	var weakenThreads = ((ns.getServerSecurityLevel - ns.getServerMinSecurityLevel) + (maxGrowThreads*0.004)) / 0.05
-	 */
 	hackableServers.sort(function (a, b) {
 		// Determines which server has a higher value based on amount possible to earn per second. ($/rate)
 		let serverA = ns.getServer(a);
 		let serverB = ns.getServer(b);
 
 
-		let _server = ns.getServer(server);
-		// let cores = ns.getServer(HOME).cpuCores;
-		// let neededGrowthPercent = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
-		// let maxGrowThreads = Math.ceil(neededGrowthPercent / growPercent(_server, 1, player, cores));
-		// // var maxGrowThreads = ((maxRam / ns.getScriptRam(GROW)) - (ns.getScriptRam(WEAKEN) * 2000));
-		// var weakenThreads = ((ns.getServerSecurityLevel - ns.getServerMinSecurityLevel) + (maxGrowThreads * 0.004)) / 0.05
-
-
-		// let hackValueA = hackPercent(serverA, player) * ns.getServerMaxMoney(a);
-		// let timeA = weakenTime(serverA, player) * weakenThreads
-		// 	+ growTime(serverA, player) * maxGrowThreads
-		// 	+ hackTime(serverA, player);
-
-		// let hackValueB = hackPercent(serverB, player) * ns.getServerMaxMoney(b);
-		// let timeB = weakenTime(serverB, player) + growTime(serverB, player) + hackTime(serverB, player);
-
-		// let serverAValue = hackValueA / timeA;
-		// let serverBValue = hackValueB / timeB;
-		let serverAValue = ns.getServerMaxMoney(server)/hackTime(_server, player);
-		let serverBValue = ns.getServerMaxMoney(server)/hackTime(_server, player);
+		// let _server = ns.getServer(server);
+		let serverAValue = ns.getServerMaxMoney(a)/hackTime(serverA, player);
+		let serverBValue = ns.getServerMaxMoney(b)/hackTime(serverB, player);
 		return serverAValue < serverBValue ? 1 : serverAValue > serverBValue ? -1 : 0;
 	});
 }
