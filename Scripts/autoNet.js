@@ -4,10 +4,12 @@ import {
 	CONTROL_INBOUND_PORT,
 	HOME, MAX_SERVER_RAM, MAX_SERVER_COST
 } from "lib/customConstants.js";
+import infectVulnerableServer from "infect.js";
 const LVL = 0;
 const RAM = 1;
 const CORE = 2;
 const DEATH_MSG = "AUTO_NET"
+var serverIter = 0;
 
 export async function main(ns) {
 	let paused = false;
@@ -99,7 +101,7 @@ export async function main(ns) {
 							ns.print("No best property chosen?")
 					}
 				}
-			}else{
+			} else {
 				ns.print(`Saving for server purchase...`)
 			}
 		}
@@ -194,7 +196,14 @@ function checkServerPurchase(ns) {
 		&& ns.getPurchasedServerLimit() > ns.getPurchasedServers().length) {
 		// Attempt purchase
 		if (serverCost < ns.getServerMoneyAvailable(HOME)) {
-			ns.purchaseServer(MAX_SERVER_RAM);
+			let serverName = `alpha-${serverIter}`;
+			while (ns.serverExists(serverName)) {
+				serverIter++;
+				serverName = `alpha-${serverIter}`;
+			}
+			ns.purchaseServer(serverName, MAX_SERVER_RAM);
+			ns.print(`PURCHASED: ${serverName}`)
+			infectVulnerableServer(ns, serverName);
 		} else {
 			return true;
 		}
