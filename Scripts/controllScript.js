@@ -9,7 +9,20 @@
  * 		- This would probably be best suited as a seperate application to start, could always call it from here/reserve mem
  * 
  * [] Bit for buying large servers (set a target? Scale based on hacking stat % buffs)
+ * 		- Would need to interupt autoNode probably to save for large servers.
+ * 		- Or just buy them up when possible if they start outpacing autonodes in production potential?
  * // Would be nice if we had a list of known servers we need to backdoor for FACTIONS, so it would give a toast notification!
+ */
+
+/**
+ * [] Make a unit test to ensure things are functioning as I intend.
+ * hack first!
+ * Then regrow by 200%!
+ * Then Weaken!
+ * Try isolating the current prime & attack functions to target a test server.
+ * - Goal should be to regrow 200% every time, weaken down to min every time, and hack less than half!
+ * 
+ * [] Start breaking down my monolithic script into smaller bits for easier debugging!
  */
 import PriorityQueue from "lib/PriorityQueue.js";
 import ServerNode from "lib/ServerNode.js";
@@ -312,6 +325,8 @@ function isPrimed(ns, server) {
 // Could also use ports to ensure things are synced up via comm channels, but not sure if that would add to RAM usage..
 // It does not! Wow. I'll totally just do that then, that seems way easier than guessing timings!
 // Say port 1 is for weaken comms, 2 is for growth, and 3 is for hacking!
+
+// TODO: Try splitting this out into another class at some point?
 async function primeServer(ns, server) {
 	/**
 	 * PRIMING server.
@@ -321,8 +336,12 @@ async function primeServer(ns, server) {
 	let _server = ns.getServer(server);
 	let cores = ns.getServer(HOME).cpuCores;
 	let neededGrowthPercent = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
-	let maxGrowThreads = Math.ceil(neededGrowthPercent / growPercent(_server, 1, player, cores));
-	var weakenThreads = ((ns.getServerSecurityLevel - ns.getServerMinSecurityLevel) + (maxGrowThreads * 0.004)) / 0.05
+	let maxGrowThreads = Math.ceil(
+		Math.log10(neededGrowthPercent)
+		/Math.log10(growPercent(_server, 1, player, cores))
+		);
+	var weakenThreads = ((ns.getServerSecurityLevel(server) - ns.getServerMinSecurityLevel(server)) + (maxGrowThreads * 0.004)) / 0.05
+
 	let timeToGrow = growTime(_server, player);
 	let timeToWeaken = weakenTime(_server, player);
 	// Sets timer delay to ensure weaken is completed only AFTER grow finishes.
