@@ -11,7 +11,7 @@ export async function main(ns) {
 	}
 }
 
-async function infectVulnerableServer(ns, server) {
+export default async function infectVulnerableServer(ns, server) {
 	await ns.scp(WEAKEN, server);
 	await ns.scp(GROW, server);
 	await ns.scp(HACK, server);
