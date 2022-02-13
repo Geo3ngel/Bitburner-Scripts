@@ -1,5 +1,6 @@
 import {
 	SERVER_LIST,
+    CCT_MAP,
     HOME
 } from "lib/customConstants.js";
 
@@ -14,32 +15,9 @@ export async function main(ns) {
             var contract = serversWithCct[i];
             var contractType = ns.codingcontract.getContractType(contract[0], contract[1]);
             ns.print(`Found ${contractType} on ${contract[1]}`)
-        //     switch (contractType) {
-        //         case "Find Largest Prime Factor":
-        //             await ns.exec("contract-prime-factor.ns", HOME, 1, contract[0], contract[1]);
-        //             break;
-        //         case "Total Ways to Sum":
-        //             await ns.exec("contract-total-sum.ns", HOME, 1, contract[0], contract[1]);
-        //             break;
-        //         case "Array Jumping Game":
-        //             await ns.exec("contract-array-jump.ns", HOME, 1, contract[0], contract[1]);
-        //             break;
-        //         case "Algorithmic Stock Trader II":
-        //             await ns.exec("contract-stocks-2.ns", HOME, 1, contract[0], contract[1]);
-        //             break;
-        //         case "Unique Paths in a Grid I":
-        //             await ns.exec("contract-unique-paths.ns", HOME, 1, contract[0], contract[1]);
-        //             break;
-        //         //case "Unique Paths in a Grid II":
-        //         //    await ns.exec("contract-unique-paths-2.ns", home, 1, contract[0], contract[1]);
-        //         //    break;
-        //         case "Find All Valid Math Expressions":
-        //             await ns.exec("contract-valid-expressions.ns", home, 1, contract[0], contract[1]);
-        //             break;
-        //         default:
-        //             ns.print(`No match for ${contractType}`)
-        //             break;
-        //     }
+            var solveScritp = CCT_MAP.get(contractType);
+            var version = getVersion(contractType);
+            ns.exec(solveScritp, HOME, 1, contract[0], contract[1], version, randomValue());
         }
         
         await ns.sleep(60000);
@@ -54,4 +32,21 @@ function findCctFiles(ns){
 			serversWithCct.push([serverContracts[c], server]);
 		}
 	}
+}
+
+function getVersion(string){
+    if(string.endsWith("IV")){
+        return 4;
+    }else if(string.endsWith("III")){
+        return 3;
+    }else if(string.endsWith("II")){
+        return 2;
+    }else if(string.endsWith("I")){
+        return 1;
+    }
+    return 0;
+}
+
+function randomValue() {
+	return Math.floor(Math.random() * 100000);
 }
