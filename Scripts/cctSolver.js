@@ -3,6 +3,7 @@ import {
     CCT_MAP,
     HOME
 } from "lib/customConstants.js";
+import randomValue from "lib/util.js"
 
 var serversWithCct = []
 var running = true;
@@ -14,10 +15,10 @@ export async function main(ns) {
 		for (let i in serversWithCct) {
             var contract = serversWithCct[i];
             var contractType = ns.codingcontract.getContractType(contract[0], contract[1]);
-            ns.print(`Found ${contractType} on ${contract[1]}`)
-            var solveScritp = CCT_MAP.get(contractType);
+            var solveScript = CCT_MAP.get(contractType);
             var version = getVersion(contractType);
-            ns.exec(solveScritp, HOME, 1, contract[0], contract[1], version, randomValue());
+            ns.print(`Found "${contractType}" on ${contract[1]} => ${solveScript}`)
+            ns.exec(solveScript, HOME, 1, contract[0], contract[1], version, randomValue());
         }
         
         await ns.sleep(60000);
@@ -45,8 +46,4 @@ function getVersion(string){
         return 1;
     }
     return 0;
-}
-
-function randomValue() {
-	return Math.floor(Math.random() * 100000);
 }
