@@ -1,21 +1,14 @@
 /**
  * TODO: Make this the ultimate controll script!
  * The goal of this script is to basically be a glorified events manager.
- * [] Then the hackEventCoordinator should manage how we stagger out weaken, grow, and hack commands, 
- * and what vulnerable servers run how many of the threads for each distributed attack!
  * 
- * The contractSolver will ideally automatically solve contracts, and noify me of their completion, so I can choose rep or $$$.
+ * [] The contractSolver will ideally automatically solve contracts, and noify me of their completion, so I can choose rep or $$$.
  * - possibly allow myself to assign which company to build rep for, if this is even automatable.
  * [] MVP for now is just identifying which servers have cct files and notifying me.
  * 		- Might be able to run them with a script? Needs further research.
+ * 		- This would probably be best suited as a seperate application to start, could always call it from here/reserve mem
  * 
- * Should map out programs that need stop/start from this script w/ their RAM usage, so we know how much we need to
- * reserve for their respective server! (I.E. autoNode on home takes up X ram, so when we calculate how much to 
- * use for threading, we take that reserved amount into account and avoid using it)
- * - More along this vein, I could very well do ram calcs ahead of time and pass them on as args to other scripts to avoid
- *   eating up unnecessary RAM. [OPTIMIZATION] 
- * - Or try to keep track of this via ports... (Seems messy)
- * 
+ * [] Bit for buying large servers (set a target? Scale based on hacking stat % buffs)
  * // Would be nice if we had a list of known servers we need to backdoor for FACTIONS, so it would give a toast notification!
  */
 import PriorityQueue from "lib/PriorityQueue.js";
@@ -142,7 +135,7 @@ async function levelUpCheck(ns) {
 
 		// Servers that are now hackable will be moved onto the hackable stack/list
 		let server;
-		while (serverMap.get(notHackableServers[0]).getReqHackLvl() <= hackingLvl) {
+		while (serverMap.get(notHackableServers[0]).getReqHackLvl() <= hackingLvl && ns.hasRootAccess(notHackableServers[0])) {
 			server = notHackableServers.shift();
 			hackableServers.push(server);
 
@@ -284,7 +277,7 @@ export async function processServer(ns, server) {
 
 async function isHackable(ns, server) {
 	let reqHackingLvl = ns.getServerRequiredHackingLevel(server);
-	if (ns.getHackingLevel() >= reqHackingLvl) {
+	if (ns.getHackingLevel() >= reqHackingLvl && ns.hasRootAccess(server)) {
 		hackableServers.push(server);
 		return true;
 	} else {
@@ -372,8 +365,16 @@ async function attackServer(ns, server) {
 	// weakenThreads = Math.ceil((weakenThreads - (growThreads * 0.004))); //Getting required threads to fully weaken the server
 	var weakenThreads = Math.ceil((hackThreads * 0.002 + growThreads * 0.004) / 0.05);
 
+	///
+	///	Priming Delay
+	///
+	let delay = 0;
+	if(serverMap.get(server).getPrimingTimeStamp > Date.now()){
+		delay = serverMap.get(server).getPrimingTimeStamp - Date.now()
+	}
+
 	ns.print(`ATTACKING: ${server} w/ ${hackThreads} hack threads`)
-	distributeAttackLoad(ns, server, HACK, hackThreads, 0);
+	distributeAttackLoad(ns, server, HACK, hackThreads, delay);
 	/**
 	 * PRIMING server.
 	 * Regrow what will be lost from the hack, and weaken what would be strengthened.
@@ -382,13 +383,13 @@ async function attackServer(ns, server) {
 	let timeToHack = hackTime(_server, player);
 	let timeToGrow = growTime(_server, player);
 	let timeToWeaken = weakenTime(_server, player);
-	let growDelay = 0;
-	let weakenDelay = 0;
+	let growDelay = delay;
+	let weakenDelay = delay;
 	if (timeToHack > timeToGrow) {
-		growDelay = timeToHack - timeToGrow;
+		growDelay = timeToHack - timeToGrow + delay;
 	}
 	if (timeToGrow + growDelay > timeToWeaken) {
-		weakenDelay = timeToGrow + growDelay - weakenDelay;
+		weakenDelay = timeToGrow + growDelay - weakenDelay + delay;
 	}
 
 	distributeAttackLoad(ns, server, GROW, growThreads, growDelay);
