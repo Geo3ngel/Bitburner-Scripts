@@ -98,17 +98,16 @@ export async function main(ns) {
 	// Traversal should generate a list of all servers, ideally seperating them into hackable/notHackable
 	// Evaluating Servers & Cracking them!
 	traverseServers(ns);
-	ns.print(`Servers: ${vulnerableServers}`)
-	// await ns.sleep(10000)
+	// ns.print(`Servers: ${vulnerableServers}`)
 	ns.exec("infect.js", HOME, 1);
 
 	let running = true;
+	let iter = 0;
 	while (running) {
 		for (let [key, value] of controlCycle.entries()) {
 			// ns.print(`Key: ${key}, ${controlCycle.size}`)
 			value(ns);
 		}
-		// ns.print(`HACKACLE servers: ${hackableServers}`);
 		await ns.sleep(1000);
 	}
 
@@ -143,7 +142,7 @@ async function levelUpCheck(ns) {
 
 		// Servers that are now hackable will be moved onto the hackable stack/list
 		let server;
-		while (serverMap[notHackableServers[0]].getReqHackLvl() <= hackingLvl) {
+		while (serverMap.get(notHackableServers[0]).getReqHackLvl() <= hackingLvl) {
 			server = notHackableServers.shift();
 			hackableServers.push(server);
 
@@ -156,14 +155,13 @@ async function levelUpCheck(ns) {
 async function multiStaggeredHack(ns) {
 	// Determines which vulnerable servers are best to hack for $$$
 	sortHackableServers(ns);
-	ns.print(`Entering Stagger Attack: ${hackableServers}`);
+	ns.print(`ENTERING Stagger Attack: ${hackableServers}`);
 	let topN = 5; // Maybe tweak this value later
 	for (let i = 0; i < topN; i++) {
 		let server = hackableServers[i]
-		ns.print(`Checking: ${i}, ${server}`)
 		if (isPrimed(ns, server)) {
 			attackServer(ns, server);
-		} else if (serverMap[server].isPriming()) {
+		} else if (serverMap.get(server).isPriming()) {
 			// Start setting up attack threads instead!
 			// Priming threads have alread been initiated!
 			attackServer(ns, server);
@@ -171,6 +169,7 @@ async function multiStaggeredHack(ns) {
 			primeServer(ns, server);
 		}
 	}
+	ns.print(`Finished multiStaggeredHack`)
 }
 
 export async function countExploits(ns) {
@@ -244,8 +243,8 @@ async function crackServer(ns, server, reqPorts) {
 export async function processServer(ns, server) {
 	ns.print(`Processing Server: ${server}`)
 	let exploited = ns.hasRootAccess(server);
+	let reqPorts = ns.getServerNumPortsRequired(server);
 	if (!exploited) {
-		let reqPorts = ns.getServerNumPortsRequired(server);
 		// Attempt to crack
 		if (reqPorts <= exploits) {
 			crackServer(ns, server, reqPorts);
@@ -278,7 +277,9 @@ export async function processServer(ns, server) {
 	// TODO: hasCCT check?
 	let hasCCT = false;
 	// Add server to map w/ it's relevant info stored in a ServerNode for later ease of access.
-	map.set(server, new ServerNode(server, reqPorts, hackLvlReq, exploited, maxRam, traversed, hasCCT, subServers));
+	let serverNode = new ServerNode(server, reqPorts, hackLvlReq, exploited, maxRam, traversed, hasCCT, subServers);
+	serverMap.set(server, serverNode);
+	ns.print(`SET SERVERNODE for ${server}, ${Array.from(serverMap.keys())} === ${vulnerableServers.length}`)
 }
 
 async function isHackable(ns, server) {
@@ -351,10 +352,12 @@ async function primeServer(ns, server) {
 	 * Server is PRIMING
 	 * - Mark the serverNode as PRIMING, and set the timestamp/time it will take for weakening+delay to complete!
 	 */
-	serverMap[server].setPriming(timeToWeaken + weakenDelayTime);
+	// ns.print(`SET PRIMING ${server} scheduled to complete at: ${Date.now()+timeToWeaken + weakenDelayTime}`);
+	serverMap.get(server).setPriming(timeToWeaken + weakenDelayTime);
 }
 
 async function attackServer(ns, server) {
+	ns.print("ATTACKING")
 	let _server = ns.getServer(server);
 	let cores = ns.getServer(HOME).cpuCores;
 	// Should give the amount of threads needed to grow by 200%
@@ -401,6 +404,7 @@ function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { /
 	for (let i = 0; i < vulnerableServers.length; i++) {
 		// figure out how many threads we can run of our script on the given server
 		host = vulnerableServers[i];
+		// ns.print(`ATTEMPT distributing ${totalThreads} ${script} threads to" ${host} w/ ${delay} delay`)
 		ram = ns.getServerRam(host);
 		threads = Math.floor((ram[0] - ram[1]) / scriptRam);
 		if (threads > 0) {
@@ -409,18 +413,22 @@ function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { /
 				// Limit to only the needed amount!
 				threads = totalThreads;
 			}
-			// ns.print(`Distributing ${threads} threads to ${host}`)
+			ns.print(`Distributing ${threads} threads to ${host}`)
 			totalThreads -= threads;
-			ns.exec(script, host, threads, targetServer, delay);
+			ns.exec(script, host, threads, targetServer, delay, randomValue());
 		}
 		if (totalThreads <= 0) {
-			// ns.print(`Distributed ${script} attack for ${targetServer} to: ${host}: COMPETED ALL THREADS! ${totalThreads}`)
+			ns.print(`Distributed ${script} attack for ${targetServer} to: ${host}: COMPETED ALL THREADS! ${totalThreads}`)
 			return; // Done distributing the attack load!
 		}
-		// else {
-		// 	ns.print(`Distributed ${script} attack threads remaining: ${totalThreads}`)
-		// }
+		else {
+			ns.print(`Distributed ${script} attack threads remaining: ${totalThreads}`)
+		}
 	}
+}
+
+function randomValue() {
+	return Math.floor(Math.random() * 100000);
 }
 
 async function sortVulnerableServersByFreeRam(ns) {
