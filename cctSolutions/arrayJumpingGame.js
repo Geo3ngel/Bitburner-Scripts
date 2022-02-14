@@ -1,11 +1,11 @@
 /** @param {NS} ns **/
 export async function main(ns) {
-	// var contract = ns.args[0];
-	// var host = ns.args[1];
-	// var data = ns.codingcontract.getData(contract, host)
-	// ns.codingcontract.attempt(solve(data), contract, host)
-	var result = await solve(ns, [7,9,7,0,2,8,3,4,6,5,9,7,9,4,1,1,0,1,1,0,0,0])
-	ns.toast(`RESULT: ${result}`)
+	var contract = ns.args[0];
+	var host = ns.args[1];
+	var data = ns.codingcontract.getData(contract, host)
+	var answer = await solve(ns, data)
+	var result = ns.codingcontract.attempt(answer, contract, host)
+	ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 }
 
 async function solve(ns, data) {
