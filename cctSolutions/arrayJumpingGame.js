@@ -5,7 +5,7 @@ export async function main(ns) {
 	var data = ns.codingcontract.getData(contract, host)
 	var answer = await solve(ns, data)
 	var result = ns.codingcontract.attempt(answer, contract, host)
-	ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
+	ns.toast(`Jumping Game contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 }
 
 async function solve(ns, data) {
