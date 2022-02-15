@@ -1,10 +1,10 @@
 export async function main(ns) {
 	var contract = ns.args[0];
 	var host = ns.args[1];
-	// var data = ns.codingcontract.getData(contract, host)
-	var answer = await solve(ns, "())((a)())a(aa)(((")
-	// var result = ns.codingcontract.attempt(answer, contract, host)
-	// ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
+	var data = ns.codingcontract.getData(contract, host)
+	var answer = await solve(ns, data)
+	var result = ns.codingcontract.attempt(answer, contract, host)
+	ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 	ns.print(`RESULT: ${answer}`)
 	await ns.sleep(10000)
 }
