@@ -1,19 +1,19 @@
 from FiniteStateMachine import FiniteStateMachine
 from ScreenGrab import ScreenGrab
 # Runs the main loop for capturing images & processing them via State Machine.
-miniGameStatePosX = 100
-miniGameStatePosY = 100
+miniGameStatePosX = 0
+miniGameStatePosY = 130
 miniGameWidth = 1000
-miniGameHeight = 100
+miniGameHeight = 70
 
 # Fill with state names!
 MiniGames = {
-    "backwards" : "TYPE_BACKWARDS_STATE",
+    "backward" : "TYPE_BACKWARDS_STATE",
     "slash" : "SLASHING_STATE",
     "wires" : "WIRES_STATE",
     "compliment" : "COMPLIMENT_GAURD_STATE",
-    "brackets" : "CLOSE_BRACKETS_STATE",
-    "mines" : "MINES_STATE", # Remember state & Replay state needed!
+    "bracket" : "CLOSE_BRACKETS_STATE",
+    "mine" : "MINES_STATE", # Remember state & Replay state needed!
     "symbols" : "MATCH_SYMBOLS_STATE"
 }
     
@@ -34,6 +34,7 @@ def checkCompleteState():
 def checkMiniGameState():
     # Set the position and dimensions to check for the MiniGameState.
     stateCheck = ScreenGrab(miniGameStatePosX, miniGameStatePosY, miniGameWidth, miniGameHeight);
+    stateCheck.displayImage()
     # Parse image into Text
     stateText = stateCheck.parseText().lower();
     # Determine which mini game it is in based on text (If any)

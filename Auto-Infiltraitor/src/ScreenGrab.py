@@ -13,7 +13,7 @@ class ScreenGrab:
         self.y = positionY
         self.width = width
         self.height = height
-        self.img =  ImageGrab.grab(bbox=(self.x, self.y, self.x + self.width,self.y + self.height)) #x, y, w, h
+        self.img =  ImageGrab.grab(bbox=(self.x, self.y, self.x+ self.width,self.y + self.height)) #x, y, w, h
         self.img_np = np.array(self.img)
         self.frame = cv2.cvtColor(self.img_np, cv2.COLOR_BGR2GRAY)
 
@@ -29,7 +29,7 @@ class ScreenGrab:
             
     def displayImage(self):
         while True:
-            cv2.imshow("Image:", self.img)
+            cv2.imshow("Image:", self.img_np)
             if cv2.waitKey(0):
                 break
     
