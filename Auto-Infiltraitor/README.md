@@ -9,4 +9,4 @@ https://www.anaconda.com/products/individual
 ## Installing the conda environment to run:
 conda env create --file InfiltraitorEnv.yml
 ## Updating the environment file:
-conda env export --name ENVNAME > InfiltraitorEnv.yml
+conda env export --name Infiltraitor > InfiltraitorEnv.yml
