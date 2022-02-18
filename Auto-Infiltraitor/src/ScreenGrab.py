@@ -8,20 +8,17 @@ from pytesseract import image_to_string
 config = ('-l eng --oem 1 --psm 3')
 class ScreenGrab:
     # Define the position & dimension of the image to capture
-    def __init__(self, positionX, positionY, width, height, monitor):
+    def __init__(self, positionX, positionY, width, height, monitor=0):
         self.x = positionX
         self.y = positionY
         self.width = width
         self.height = height
-        self.img =  ImageGrab.grab(bbox=(self.x, self.y, self.width, self.height)) #x, y, w, h
+        self.img =  ImageGrab.grab(bbox=(self.x, self.y, self.x + self.width,self.y + self.height)) #x, y, w, h
         self.img_np = np.array(self.img)
         self.frame = cv2.cvtColor(self.img_np, cv2.COLOR_BGR2GRAY)
 
-    def captureImg(self):
-        pass
-
     def parseText(self):
-        text = pytesseract.image_to_string(self.frame, config=config)
+        text = image_to_string(self.frame, config=config)
         return text
     
     def displayFrame(self):

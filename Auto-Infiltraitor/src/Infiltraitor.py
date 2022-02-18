@@ -21,7 +21,7 @@ def checkCompleteState():
     # TODO: Update to actually check/verify we are in the completed state
     stateCheck = ScreenGrab(0, 0, 100, 100);
     # Parse some string?
-    stateText = stateCheck.parseText.lower();
+    stateText = stateCheck.parseText().lower();
     if "reputation" is stateText:
         # TODO Select faction we want to give rep to (Might change to do intelligently LATER)
         # Select give Rep
@@ -29,7 +29,7 @@ def checkCompleteState():
     else:
         # Error state. Log & restart
         print("Error in Completion State")
-        return ("ERROR_STATE", "Error in Completion State")
+        return "ERROR_STATE"
     
 def checkMiniGameState():
     # Set the position and dimensions to check for the MiniGameState.
