@@ -1,4 +1,4 @@
-from StateMachine import StateMachine
+from FiniteStateMachine import FiniteStateMachine
 
 positive_adjectives = ["great","super", "fun", "entertaining", "easy"]
 negative_adjectives = ["boring", "difficult", "ugly", "bad"]
@@ -50,7 +50,7 @@ def neg_state(txt):
     return ("neg_state", "")
 
 
-m = StateMachine()
+m = FiniteStateMachine()
 m.add_state("Start", start_transitions)
 m.add_state("Python_state", python_state_transitions)
 m.add_state("is_state", is_state_transitions)

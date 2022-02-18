@@ -1,6 +1,6 @@
 # Credit to https://python-course.eu/applications-python/finite-state-machine.php for the state machine bits
 
-class StateMachine:
+class FiniteStateMachine:
     
     def __init__(self):
         self.handlers = {}
@@ -30,4 +30,4 @@ class StateMachine:
                 print("reached ", newState)
                 break 
             else:
-                handler = self.handlers[newState.upper()]   
+                handler = self.handlers[newState.upper()]
