@@ -21,6 +21,9 @@ class ScreenGrab:
         text = image_to_string(self.frame, config=config)
         return text
     
+    def flipFrame(self):
+        self.frame = cv2.flip(self.frame)
+    
     def displayFrame(self):
         while True:
             cv2.imshow("Frame:", self.frame)
