@@ -36,15 +36,15 @@ class ScreenGrab:
             if cv2.waitKey(0):
                 break
     
- # TODO: Set this up as a class that takes in position & size of img to capture
-def screenGrab():
-    box = ()
-    im = ImageGrab.grab(bbox=None)
-    im.save(os.getcwd() + '\\full_snap__' + str(int(time.time())) +
-'.png', 'PNG')
- 
-def main():
-    screenGrab()
- 
-if __name__ == '__main__':
-    main()
+    def makeFileName(self, name, directory):
+        fileName = os.getcwd() + '\\' 
+        if directory is not "":
+            fileName = fileName + directory + '\\'
+        fileName = fileName + name + str(int(time.time()))
+        return fileName
+            
+    def saveImage(self, name, directory=""):
+        self.img.save(self.makeFileName(name, directory) + '.png', 'PNG')
+        
+    def saveFrame(self, name, directory=""):
+        self.img.save(self.makeFileName(name, directory) + '.png', 'PNG')
