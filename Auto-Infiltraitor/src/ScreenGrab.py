@@ -15,7 +15,7 @@ class ScreenGrab:
         self.height = height
         self.img =  ImageGrab.grab(bbox=(self.x, self.y, self.width, self.height)) #x, y, w, h
         self.img_np = np.array(self.img)
-        self.frame = cv2.cvtColor(img_np, cv2.COLOR_BGR2GRAY)
+        self.frame = cv2.cvtColor(self.img_np, cv2.COLOR_BGR2GRAY)
 
     def captureImg(self):
         pass
