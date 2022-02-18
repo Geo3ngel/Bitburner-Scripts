@@ -16,6 +16,29 @@ MiniGames = {
     "mine" : "MINES_STATE", # Remember state & Replay state needed!
     "symbols" : "MATCH_SYMBOLS_STATE"
 }
+
+complimentsList = [
+    "affectionate",
+    "agreeable",
+    "bright",
+    "charming",
+    "creative",
+    "determined",
+    "energetic",
+    "friendly",
+    "funny",
+    "generous",
+    "polite",
+    "likable",
+    "diplomatic",
+    "helpful",
+    "giving",
+    "kind",
+    "hardworking",
+    "patient",
+    "dynamic",
+    "loyal",
+]
     
 def checkCompleteState():
     # TODO: Update to actually check/verify we are in the completed state
@@ -58,6 +81,12 @@ def typeItBackwards(arg):
     while detectedState is "TYPE_BACKWARDS_STATE":
         # Process state
         detectedState = checkMiniGameState()
+        # Grab Backwards text area
+        textArea = ScreenGrab(200, 500, 1000, 600) # TODO: Set correct area grab for these values
+        textArea.flipFrame()
+        text = textArea.parseText()
+        # TODO: Type out text
+        print("Backwards text: "+text)
     return (detectedState, None)
 
 def cutTheWires(arg):
@@ -78,6 +107,16 @@ def complimentTheGaurd(arg):
         # Process state
         detectedState = checkMiniGameState()
         # TODO: Process state
+        # Read current message
+        textArea = ScreenGrab(200, 500, 1000, 600) # TODO: Set correct area grab for these values
+        currentMsg = textArea.parseText()
+        # Determine whether to accept or press up
+        if currentMsg in complimentsList:
+            # Hit Enter
+            pass
+        else:
+            # Hit up
+            pass
     return (detectedState, None)
 
 def closeTheBrackets(arg):
