@@ -5,6 +5,30 @@ import os
 import time
 from pytesseract import image_to_string
 
+colorMap = {
+    # Map color name to rgb values!
+    "red" : [0, 0 ,0], 
+    "blue" : [], 
+    "yellow" : [], 
+    "white" : []
+}
+
+leftArrow = cv2.imread('left-arrow.PNG')
+leftArrowGrey = cv2.cvtColor(leftArrow, cv2.COLOR_BGR2GRAY)
+rightArrow = cv2.imread('right-arrow.PNG')
+rightArrowGrey = cv2.cvtColor(leftArrow, cv2.COLOR_BGR2GRAY)
+upArrow = cv2.imread('up-arrow.PNG')
+upArrowGrey = cv2.cvtColor(leftArrow, cv2.COLOR_BGR2GRAY)
+downArrow = cv2.imread('down-arrow.PNG')
+downArrowGrey = cv2.cvtColor(leftArrow, cv2.COLOR_BGR2GRAY)
+
+arrowMap = {
+    "left" : leftArrowGrey,
+    "right" : rightArrowGrey,
+    "up" : upArrowGrey,
+    "down" : downArrowGrey
+}
+
 config = ('-l eng --oem 1 --psm 3')
 class ScreenGrab:
     # Define the position & dimension of the image to capture
