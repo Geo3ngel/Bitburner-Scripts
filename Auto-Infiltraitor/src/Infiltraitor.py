@@ -89,13 +89,16 @@ complimentsList = [
 ]
     
 def checkCompleteState():
-    # TODO: Update to actually check/verify we are in the completed state
-    stateCheck = ScreenGrab(0, 20, 100, 80);
+    stateCheck = ScreenGrab(0, 50, 100, 50);
     # Parse some string?
     stateText = stateCheck.parseText().lower();
     if "successful" is stateText:
-        # TODO Select faction we want to give rep to (Might change to do intelligently LATER)
         # Select give Rep
+        mouse_select_at(60, 275)
+        time.sleep(.1)
+        mouse_select_at(108, 823) # Change for faciton selection! [Will make intelligent selection model later]
+        time.sleep(.1)
+        mouse_select_at(200, 275)
         return ("COMPLETED_STATE", "Finished")
     else:
         # Error state. Log & restart
@@ -126,6 +129,7 @@ def detectMiniGame(arg):
     
 def typeItBackwards(arg):
     print("Entered Backwards Minigame")
+    time.sleep(.1)
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "TYPE_BACKWARDS_STATE":
@@ -143,6 +147,7 @@ def typeItBackwards(arg):
 
 def cutTheWires(arg):
     print("Entered Wires Minigame")
+    time.sleep(.1)
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "WIRES_STATE":
@@ -168,6 +173,7 @@ def cutTheWires(arg):
 
 def complimentTheGuard(arg):
     print("Entered Compliment Minigame")
+    time.sleep(.1)
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "COMPLIMENT_GAURD_STATE":
@@ -191,6 +197,7 @@ def complimentTheGuard(arg):
 # Could probably just spam ')', '>', ']', '}' keys and do just fine.
 def closeTheBrackets(arg):
     print("Entered Brackets Minigame")
+    time.sleep(.1)
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "CLOSE_BRACKETS_STATE":
@@ -207,6 +214,7 @@ def closeTheBrackets(arg):
 
 def matchTheSymbols(arg):
     print("Entered Symbols Minigame")
+    time.sleep(.1)
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "MATCH_SYMBOLS_STATE":
@@ -234,6 +242,7 @@ def matchTheSymbols(arg):
 def slashGaurd(arg):
     # print("Entered Slashing Minigame")
     # Check we are still in this state
+    time.sleep(.1)
     detectedState = checkMiniGameState()
     while detectedState is "SLASHING_STATE":
         # Check if it says attack
@@ -249,6 +258,7 @@ def slashGaurd(arg):
 
 def cheatCode(arg):
     print("Entered Cheat Code Minigame")
+    time.sleep(.1)
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "CHEAT_CODE":
