@@ -42,10 +42,12 @@ MiniGames = {
     "backward" : "TYPE_BACKWARDS_STATE",
     "slash" : "SLASHING_STATE",
     "wires" : "WIRES_STATE",
-    "compliment" : "COMPLIMENT_GAURD_STATE",
+    "nice" : "COMPLIMENT_GAURD_STATE",
     "bracket" : "CLOSE_BRACKETS_STATE",
     "mine" : "MINES_STATE", # Remember state & Replay state needed!
-    "symbols" : "MATCH_SYMBOLS_STATE"
+    "symbols" : "MATCH_SYMBOLS_STATE",
+    "code" : "CHEAT_CODE",
+    "get ready" : "DETECT_MINIGAME" 
 }
 
 complimentsList = [
