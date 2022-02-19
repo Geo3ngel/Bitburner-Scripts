@@ -105,7 +105,6 @@ def checkCompleteState():
 def checkMiniGameState():
     # Set the position and dimensions to check for the MiniGameState.
     stateCheck = ScreenGrab(miniGameStatePosX, miniGameStatePosY, miniGameWidth, miniGameHeight);
-    stateCheck.displayImage()
     # Parse image into Text
     stateText = stateCheck.parseText().lower();
     # Determine which mini game it is in based on text (If any)
@@ -115,26 +114,32 @@ def checkMiniGameState():
             # Returns what the current state is believed to be
             return MiniGames[text]
     # Return error state? (End w/ Debug) Eventually, we want this to just output to an error log, and restart
-    return checkCompleteState()
+    completed = checkCompleteState()
+    if completed is "ERROR_STATE":
+        stateCheck.saveImage("ERROR", unique=False)
+    return completed
 
 def detectMiniGame(arg):
     print("Entered mini-game DETECTION")
     miniGame = checkMiniGameState()
     return (miniGame, None)
     
+# TODO: pass images as args?
 def typeItBackwards(arg):
     print("Entered Backwards Minigame")
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "TYPE_BACKWARDS_STATE":
-        # Process state
-        detectedState = checkMiniGameState()
         # Grab Backwards text area
-        textArea = ScreenGrab(200, 500, 1000, 600) # TODO: Set correct area grab for these values
+        textArea = ScreenGrab(400, 170, 800, 250)
         textArea.flipFrame()
+        textArea.saveFrame("BACKWARDS")
         text = textArea.parseText()
-        # TODO: Type out text
+        for character in text:
+            press_key(character) # Might need a bit more delay!
+            print("TYPING... "+str(character))
         print("Backwards text: "+text)
+        detectedState = checkMiniGameState()
     return (detectedState, None)
 
 def cutTheWires(arg):
@@ -142,66 +147,121 @@ def cutTheWires(arg):
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "WIRES_STATE":
-        # Process state
+        textArea = ScreenGrab(200, 500, 1000, 600) # TODO: Set correct area grab for these values
+        textArea.saveImage("WIRE STATE")
+        text = textArea.parseText().lower()
+        for num in numberList:
+            if num in text:
+                press_key(chr(num))
+        # Scan the columns
+        colorArea = ScreenGrab(200, 500, 1000, 600) # TODO: Set correct area grab for these values
+        # colorArea.saveImage("COLOR AREA")
+        # TODO: Figure out a good way to check each column? (How to determine number of columns? How to determine where each column is?)
+        colors = []
+        for color in colorList:
+            if color in text:
+                colors.append(color)
+        colorNums = colorArea.getColorNums(colors)
+        for num in colorNums:
+            press_key(chr(num))
         detectedState = checkMiniGameState()
-        # TODO: Process state
     return (detectedState, None)
 
-def complimentTheGaurd(arg):
+def complimentTheGuard(arg):
     print("Entered Compliment Minigame")
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "COMPLIMENT_GAURD_STATE":
-        # Process state
-        detectedState = checkMiniGameState()
-        # TODO: Process state
         # Read current message
-        textArea = ScreenGrab(200, 500, 1000, 600) # TODO: Set correct area grab for these values
+        textArea = ScreenGrab(0, 250, 200, 35)
+        text = textArea.parseText().lower()
+        textArea.saveImage("GUARD")
+        print("Guard compliment: "+text)
         currentMsg = textArea.parseText()
         # Determine whether to accept or press up
         if currentMsg in complimentsList:
             # Hit Enter
-            pass
+            press_key(keyboard.Key.enter)
         else:
             # Hit up
-            pass
+            press_key(keyboard.Key.up)
+        detectedState = checkMiniGameState()
     return (detectedState, None)
 
 def closeTheBrackets(arg):
     print("Entered Brackets Minigame")
     # Check we are still in this state
     detectedState = checkMiniGameState()
-    while detectedState is "TYPE_BACKWARDS_STATE":
-        # Process state
+    while detectedState is "CLOSE_BRACKETS_STATE":
+        textArea = ScreenGrab(0, 245, 700, 100)
+        textArea.flipFrame()
+        textArea.saveFrame("BRACKETS")
+        text = textArea.parseText()
+        print("BRACKETS : "+text)
+        for character in text:
+            # press_key(character) # Might need a bit more delay!
+            press_key_fast(character)
         detectedState = checkMiniGameState()
-        # TODO: Process state [Flip img!]
     return (detectedState, None)
 
 def matchTheSymbols(arg):
     print("Entered Symbols Minigame")
     # Check we are still in this state
     detectedState = checkMiniGameState()
-    while detectedState is "TYPE_BACKWARDS_STATE":
-        # Process state
+    while detectedState is "MATCH_SYMBOLS_STATE":
+        textArea = ScreenGrab(125, 195, 700, 35)
+        # Just replacing 'o' with '0' this way for now. Should realistically train a model using this font/Restrict it's alphabet via config
+        text = textArea.parseText().lower().replace("o", "0")
+        # print("Symbol order: "+text)
+        # textArea.saveImage("ImageArea")
+        # Splice text by space for the array!
+        # TODO: Switch to attemping to read each row individually! (Trying to read the entire array is a mess!)
+        symbolArray = [x for x in text.split()]
+        # print("Symbol array: "+str(symbolArray))
+        gridArea = ScreenGrab(0, 280, 450, 550)     # 0, 280 => 360, 650
+        grid = gridArea.parseText().lower().replace("o", "0")
+        # gridArea.saveFrame("GridArea")
+        # print("Symbol grid: "+grid)
+        gridArr = [x for x in grid.split()]
+        # Grid length? Split into rows... (Could capture a single column to calc this?)
+        # TODO: Parse text into grid
+        print("Symbol grid array: "+str(gridArr))
+        # Solve in order
         detectedState = checkMiniGameState()
-        # TODO: Process state
     return (detectedState, None)
 
-# TODO: Create variants for this one based on whether or not his gaurd is down? (Will need to be done for all reaction based games)
 def slashGaurd(arg):
-    print("Entered Slashing Minigame")
+    # print("Entered Slashing Minigame")
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "SLASHING_STATE":
-        # Process state
-        detectedState = checkMiniGameState()
-        # TODO: Implement slashing check & action
         # Check if it says attack
-        attackImg = ScreenGrab(0, 0, 100, 20);
+        attackImg = ScreenGrab(0, 190, 350, 55);
         attackStr = attackImg.parseText().lower()
+        # attackImg.saveImage("ATTACK")
         if "attack" in attackStr:
-            # TODO: Hit the space bar!
-            pass
+            print("Attacking")
+            # press_key(keyboard.Key.enter)
+            press_key_fast(keyboard.Key.enter)
+        detectedState = checkMiniGameState()
+    return (detectedState, None)
+
+def cheatCode(arg):
+    print("Entered Cheat Code Minigame")
+    # Check we are still in this state
+    detectedState = checkMiniGameState()
+    while detectedState is "CHEAT_CODE":
+        # Process state
+        # Check if it says attack
+        direction = ScreenGrab(0, 180, 55, 60); # TODO: Need to get all Arrows!
+        directionStr = direction.directionMatch()
+        print("DIRECTION: "+str(directionStr))
+        if directionStr is -1:
+            direction.saveImage("MISSING_ARROW")
+        else:
+            # press_key(directionKey[directionStr])
+            press_key_fast(directionKey[direction])
+        detectedState = checkMiniGameState()
     return (detectedState, None)
 
 def mines(arg):
@@ -212,30 +272,46 @@ def mines(arg):
     while detectedState is "MINES_STATE":
         # Process state
         detectedState = checkMiniGameState()
-        # TODO: Process state
+        minesStateImg = ScreenGrab(0, 140, 300, 50);
+        minesState = minesStateImg.parseText().lower()
+        minesStateImg.saveImage("Mine STATE")
         # Determine whether we are "remembering" the mines positions, or "marking" them.
-        # TODO: Get area of mines to check
+        # TODO: Memorize & mark!
+        minesImg = ScreenGrab(0, 230, 300, 300);
+        minesText = minesImg.parseText()
+        minesImg.saveImage("MINES ")
+        print("MINES: "+minesText)
+        if "remember" in minesState:
+            # store matches in minePositions!
+            print("Memorizing!")
+        else:
+            print("Remembering")
     return (detectedState, None)
 
 def startState(arg):
     # Select City           # Might want to Add ability to target a specific City at some point.
+    mouse_select_at(95, 670)
     # Select Target         # Might want to make a list of coords to click in association with who you are targeting.
+    mouse_select_at(356, 338)
     # Select Infiltrate     
+    mouse_select_at(351, 516)
     # Start Infiltration    # COULD make it find the start button. [No reason to though, same place everytime]
+    mouse_select_at(35, 708)
+    time.sleep(1.1)
     return ("DETECT_MINIGAME", "Start!")
 
 def printResult(arg):
     print("PRINT: "+arg)
 
-# TODO: Set up main loop to use ScreenGrab for getting new images, and interacting w/ them.
 m = FiniteStateMachine()
 m.add_state("START", startState)
 m.add_state("DETECT_MINIGAME", detectMiniGame)
 m.add_state("TYPE_BACKWARDS_STATE", typeItBackwards)
 m.add_state("SLASHING_STATE", slashGaurd)
 m.add_state("WIRES_STATE", cutTheWires)
-m.add_state("COMPLIMENT_GAURD_STATE", complimentTheGaurd)
+m.add_state("COMPLIMENT_GAURD_STATE", complimentTheGuard)
 m.add_state("CLOSE_BRACKETS_STATE", closeTheBrackets)
+m.add_state("CHEAT_CODE", cheatCode)
 m.add_state("MINES_STATE", mines)
 m.add_state("MATCH_SYMBOLS_STATE", matchTheSymbols)
 m.add_state("ERROR_STATE", None, end_state=1)
