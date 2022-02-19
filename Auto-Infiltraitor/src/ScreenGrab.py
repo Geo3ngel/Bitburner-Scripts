@@ -36,15 +36,17 @@ class ScreenGrab:
             if cv2.waitKey(0):
                 break
     
-    def makeFileName(self, name, directory):
+    def makeFileName(self, name, directory, unique=True):
         fileName = os.getcwd() + '\\' 
         if directory is not "":
             fileName = fileName + directory + '\\'
-        fileName = fileName + name + str(int(time.time()))
+        fileName = fileName + name 
+        if unique:
+            fileName = fileName + str(int(time.time()))
         return fileName
             
-    def saveImage(self, name, directory=""):
-        self.img.save(self.makeFileName(name, directory) + '.png', 'PNG')
+    def saveImage(self, name, directory="", unique=True):
+        self.img.save(self.makeFileName(name, directory, unique) + '.png', 'PNG')
         
-    def saveFrame(self, name, directory=""):
-        self.img.save(self.makeFileName(name, directory) + '.png', 'PNG')
+    def saveFrame(self, name, directory="", unique=True):
+        self.img.save(self.makeFileName(name, directory, unique) + '.png', 'PNG')
