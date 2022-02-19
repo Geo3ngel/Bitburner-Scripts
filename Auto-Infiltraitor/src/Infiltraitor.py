@@ -86,6 +86,7 @@ complimentsList = [
     "patient",
     "dynamic",
     "loyal",
+    "atesve-w" # How it reads 'loyal' right now due to not training the model on these chars.
 ]
     
 def checkCompleteState():
@@ -104,6 +105,7 @@ def checkCompleteState():
     else:
         # Error state. Log & restart
         print("Error in Completion State")
+        stateCheck.saveImage("COMPLETE CHECK")
         return "ERROR_STATE"
     
 def checkMiniGameState():
@@ -138,8 +140,8 @@ def typeItBackwards(arg):
         # Grab Backwards text area
         textArea = ScreenGrab(400, 170, 800, 250)
         textArea.flipFrame()
-        # textArea.saveFrame("BACKWARDS")
-        text = textArea.parseText().replace('|', '')
+        textArea.saveFrame("BACKWARDS")
+        text = textArea.parseText().replace('|', '').strip()
         for character in text:
             press_key_fast(character)
             print("TYPING... "+str(character))
@@ -180,11 +182,10 @@ def complimentTheGuard(arg):
     detectedState = checkMiniGameState()
     while detectedState is "COMPLIMENT_GAURD_STATE":
         # Read current message
-        textArea = ScreenGrab(0, 285, 200, 35)
-        # text = textArea.parseText().lower()
+        textArea = ScreenGrab(0, 285, 200, 35) # Does this position change based on if it is the first one to go?
         # textArea.saveImage("GUARD")
-        # print("Guard compliment: "+text)
         currentMsg = textArea.parseText().lower()
+        # print("Guard compliment: "+currentMsg)
         # Determine whether to accept or press up
         if currentMsg in complimentsList:
             # Hit Enter
@@ -192,6 +193,7 @@ def complimentTheGuard(arg):
         else:
             # Hit up
             press_key_fast(keyboard.Key.up)
+            time.sleep(.1)
         detectedState = checkMiniGameState()
     return (detectedState, None)
 
@@ -205,8 +207,8 @@ def closeTheBrackets(arg):
     while detectedState is "CLOSE_BRACKETS_STATE":
         textArea = ScreenGrab(0, 245, 700, 100)
         textArea.flipFrame()
-        # textArea.saveFrame("BRACKETS")
-        text = textArea.parseText().replace('|', '')
+        textArea.saveFrame("BRACKETS")
+        text = textArea.parseText().replace('|', '').strip()
         print("BRACKETS : "+text)
         for character in text:
             # press_key(character) # Might need a bit more delay!
@@ -250,9 +252,9 @@ def slashGaurd(arg):
         # Check if it says attack
         attackImg = ScreenGrab(0, 230, 350, 55);
         attackStr = attackImg.parseText().lower()
-        attackImg.saveImage("ATTACK")
+        # attackImg.saveImage("ATTACK")
         if "attack" in attackStr:
-            print("Attacking")
+            # print("Attacking")
             # press_key(keyboard.Key.enter)
             press_key_fast(keyboard.Key.space)
         detectedState = checkMiniGameState()
@@ -266,7 +268,7 @@ def cheatCode(arg):
     while detectedState is "CHEAT_CODE":
         # Process state
         # Check if it says attack
-        direction = ScreenGrab(0, 230, 55, 60); # TODO: Need to get all Arrows!
+        direction = ScreenGrab(0, 220, 75, 100);
         directionStr = direction.directionMatch()
         print("DIRECTION: "+str(directionStr))
         if directionStr is -1:
