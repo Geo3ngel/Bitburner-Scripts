@@ -1,11 +1,42 @@
 from FiniteStateMachine import FiniteStateMachine
 from ScreenGrab import ScreenGrab
+from pynput import mouse, keyboard
+import time
 # Runs the main loop for capturing images & processing them via State Machine.
 miniGameStatePosX = 0
-miniGameStatePosY = 130
+miniGameStatePosY = 75
 miniGameWidth = 1000
-miniGameHeight = 70
+miniGameHeight = 150
 
+_mouse = mouse.Controller()
+_keyboard = keyboard.Controller()
+
+def press_key(key):
+    time.sleep((1/60))
+    _keyboard.press(key)
+    time.sleep((1/60))
+    _keyboard.release(key)
+    
+def press_key_fast(key):
+    time.sleep((1/600))
+    _keyboard.press(key)
+    time.sleep((1/600))
+    _keyboard.release(key)
+    
+def directMoveTo(x, y):
+    cx, cy = _mouse.position
+    _mouse.move(x-cx,y-cy)
+    
+def mouse_select():
+    _mouse.press(mouse.Button.left)
+    time.sleep((1/60))
+    _mouse.release(mouse.Button.left)
+    
+def mouse_select_at(x, y):
+    time.sleep(.2)
+    directMoveTo(x, y)
+    mouse_select()
+    
 # Fill with state names!
 MiniGames = {
     "backward" : "TYPE_BACKWARDS_STATE",
