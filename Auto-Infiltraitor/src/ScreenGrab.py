@@ -53,7 +53,7 @@ class ScreenGrab:
         for direction in arrowMap.keys():
             # Compare this image to the arrow image
             res = cv2.matchTemplate(self.frame, arrowMap[direction], cv2.TM_CCOEFF_NORMED)
-            threshold = 0.6
+            threshold = 0.8
             loc = np.where(res >= threshold)
             for pt in zip(*loc[::-1]):
                 print("PT:"+str(pt))

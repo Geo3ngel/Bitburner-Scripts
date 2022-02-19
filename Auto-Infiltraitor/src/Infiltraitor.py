@@ -90,16 +90,17 @@ complimentsList = [
 ]
     
 def checkCompleteState():
-    stateCheck = ScreenGrab(0, 50, 100, 50);
+    time.sleep(.3)
+    stateCheck = ScreenGrab(0, 150, 505, 205);
     # Parse some string?
     stateText = stateCheck.parseText().lower();
     print("COMPLETE TEXT: "+stateText)
-    if "successful" is stateText:
+    if "successful" in stateText:
         # Select give Rep
         mouse_select_at(60, 275)
         time.sleep(.1)
-        mouse_select_at(108, 823) # Change for faciton selection! [Will make intelligent selection model later]
-        time.sleep(.1)
+        mouse_select_at(60, 680) # Change for faciton selection! [Will make intelligent selection model later]
+        time.sleep(.2)
         mouse_select_at(200, 275)
         return ("COMPLETED_STATE", "Finished")
     else:
@@ -205,7 +206,7 @@ def closeTheBrackets(arg):
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "CLOSE_BRACKETS_STATE":
-        textArea = ScreenGrab(0, 215, 700, 100)
+        textArea = ScreenGrab(0, 215, 700, 120)
         textArea.flipFrame()
         textArea.saveFrame("BRACKETS")
         text = textArea.parseText().replace('|', '')
@@ -268,7 +269,7 @@ def cheatCode(arg):
     while detectedState is "CHEAT_CODE":
         # Process state
         # Check if it says attack
-        direction = ScreenGrab(0, 210, 75, 100);
+        direction = ScreenGrab(0, 215, 75, 100);
         directionStr = direction.directionMatch()
         print("DIRECTION: "+str(directionStr))
         if directionStr is -1:
