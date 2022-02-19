@@ -205,10 +205,10 @@ def closeTheBrackets(arg):
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "CLOSE_BRACKETS_STATE":
-        textArea = ScreenGrab(0, 245, 700, 100)
+        textArea = ScreenGrab(0, 215, 700, 100)
         textArea.flipFrame()
         textArea.saveFrame("BRACKETS")
-        text = textArea.parseText().replace('|', '').strip()
+        text = textArea.parseText().replace('|', '')
         print("BRACKETS : "+text)
         for character in text:
             # press_key(character) # Might need a bit more delay!
@@ -268,7 +268,7 @@ def cheatCode(arg):
     while detectedState is "CHEAT_CODE":
         # Process state
         # Check if it says attack
-        direction = ScreenGrab(0, 220, 75, 100);
+        direction = ScreenGrab(0, 210, 75, 100);
         directionStr = direction.directionMatch()
         print("DIRECTION: "+str(directionStr))
         if directionStr is -1:
