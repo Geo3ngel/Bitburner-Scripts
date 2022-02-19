@@ -18,9 +18,9 @@ def press_key(key):
     _keyboard.release(key)
     
 def press_key_fast(key):
-    time.sleep((1/600))
+    time.sleep((1/300))
     _keyboard.press(key)
-    time.sleep((1/600))
+    time.sleep((1/300))
     _keyboard.release(key)
     
 def directMoveTo(x, y):
@@ -124,7 +124,6 @@ def detectMiniGame(arg):
     miniGame = checkMiniGameState()
     return (miniGame, None)
     
-# TODO: pass images as args?
 def typeItBackwards(arg):
     print("Entered Backwards Minigame")
     # Check we are still in this state
@@ -133,10 +132,10 @@ def typeItBackwards(arg):
         # Grab Backwards text area
         textArea = ScreenGrab(400, 170, 800, 250)
         textArea.flipFrame()
-        textArea.saveFrame("BACKWARDS")
+        # textArea.saveFrame("BACKWARDS")
         text = textArea.parseText()
         for character in text:
-            press_key(character) # Might need a bit more delay!
+            press_key_fast(character)
             print("TYPING... "+str(character))
         print("Backwards text: "+text)
         detectedState = checkMiniGameState()
@@ -148,7 +147,7 @@ def cutTheWires(arg):
     detectedState = checkMiniGameState()
     while detectedState is "WIRES_STATE":
         textArea = ScreenGrab(200, 500, 1000, 600) # TODO: Set correct area grab for these values
-        textArea.saveImage("WIRE STATE")
+        # textArea.saveImage("WIRE STATE")
         text = textArea.parseText().lower()
         for num in numberList:
             if num in text:
@@ -173,7 +172,7 @@ def complimentTheGuard(arg):
     detectedState = checkMiniGameState()
     while detectedState is "COMPLIMENT_GAURD_STATE":
         # Read current message
-        textArea = ScreenGrab(0, 250, 200, 35)
+        textArea = ScreenGrab(0, 285, 200, 35)
         text = textArea.parseText().lower()
         textArea.saveImage("GUARD")
         print("Guard compliment: "+text)
@@ -181,7 +180,7 @@ def complimentTheGuard(arg):
         # Determine whether to accept or press up
         if currentMsg in complimentsList:
             # Hit Enter
-            press_key(keyboard.Key.enter)
+            press_key(keyboard.Key.space)
         else:
             # Hit up
             press_key(keyboard.Key.up)
@@ -195,9 +194,9 @@ def closeTheBrackets(arg):
     while detectedState is "CLOSE_BRACKETS_STATE":
         textArea = ScreenGrab(0, 245, 700, 100)
         textArea.flipFrame()
-        textArea.saveFrame("BRACKETS")
+        # textArea.saveFrame("BRACKETS")
         text = textArea.parseText()
-        print("BRACKETS : "+text)
+        # print("BRACKETS : "+text)
         for character in text:
             # press_key(character) # Might need a bit more delay!
             press_key_fast(character)
@@ -242,7 +241,7 @@ def slashGaurd(arg):
         if "attack" in attackStr:
             print("Attacking")
             # press_key(keyboard.Key.enter)
-            press_key_fast(keyboard.Key.enter)
+            press_key_fast(keyboard.Key.space)
         detectedState = checkMiniGameState()
     return (detectedState, None)
 
@@ -260,7 +259,8 @@ def cheatCode(arg):
             direction.saveImage("MISSING_ARROW")
         else:
             # press_key(directionKey[directionStr])
-            press_key_fast(directionKey[direction])
+            dirKey = directionKey[directionStr]
+            press_key_fast(dirKey)
         detectedState = checkMiniGameState()
     return (detectedState, None)
 
@@ -272,7 +272,7 @@ def mines(arg):
     while detectedState is "MINES_STATE":
         # Process state
         detectedState = checkMiniGameState()
-        minesStateImg = ScreenGrab(0, 140, 300, 50);
+        minesStateImg = ScreenGrab(0, 140, 400, 50);
         minesState = minesStateImg.parseText().lower()
         minesStateImg.saveImage("Mine STATE")
         # Determine whether we are "remembering" the mines positions, or "marking" them.
@@ -280,7 +280,7 @@ def mines(arg):
         minesImg = ScreenGrab(0, 230, 300, 300);
         minesText = minesImg.parseText()
         minesImg.saveImage("MINES ")
-        print("MINES: "+minesText)
+        # print("MINES: "+minesText)
         if "remember" in minesState:
             # store matches in minePositions!
             print("Memorizing!")
@@ -292,11 +292,14 @@ def startState(arg):
     # Select City           # Might want to Add ability to target a specific City at some point.
     mouse_select_at(95, 670)
     # Select Target         # Might want to make a list of coords to click in association with who you are targeting.
-    mouse_select_at(356, 338)
+    # mouse_select_at(356, 338)
+    mouse_select_at(475, 500)
     # Select Infiltrate     
-    mouse_select_at(351, 516)
+    # mouse_select_at(351, 516)
+    mouse_select_at(380, 235)
     # Start Infiltration    # COULD make it find the start button. [No reason to though, same place everytime]
-    mouse_select_at(35, 708)
+    # mouse_select_at(35, 708)
+    mouse_select_at(40, 618)
     time.sleep(1.1)
     return ("DETECT_MINIGAME", "Start!")
 
