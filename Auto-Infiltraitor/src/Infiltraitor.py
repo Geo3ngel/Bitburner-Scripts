@@ -50,6 +50,21 @@ MiniGames = {
     "get ready" : "DETECT_MINIGAME" 
 }
 
+directionKey = {
+    "up" : keyboard.Key.up,
+    "down" : keyboard.Key.down,
+    "right" : keyboard.Key.right,
+    "left" : keyboard.Key.left    
+}
+
+colorList = [
+    "red", "blue", "yellow", "white"
+]
+
+numberList = [
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+]
+
 complimentsList = [
     "affectionate",
     "agreeable",
