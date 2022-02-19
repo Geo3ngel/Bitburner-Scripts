@@ -92,6 +92,7 @@ def checkCompleteState():
     stateCheck = ScreenGrab(0, 50, 100, 50);
     # Parse some string?
     stateText = stateCheck.parseText().lower();
+    print("COMPLETE TEXT: "+stateText)
     if "successful" is stateText:
         # Select give Rep
         mouse_select_at(60, 275)
@@ -116,6 +117,7 @@ def checkMiniGameState():
         if text in stateText:
             # Returns what the current state is believed to be
             return MiniGames[text]
+    time.sleep(.1)
     # Return error state? (End w/ Debug) Eventually, we want this to just output to an error log, and restart
     completed = checkCompleteState()
     if completed is "ERROR_STATE":
@@ -137,7 +139,7 @@ def typeItBackwards(arg):
         textArea = ScreenGrab(400, 170, 800, 250)
         textArea.flipFrame()
         # textArea.saveFrame("BACKWARDS")
-        text = textArea.parseText()
+        text = textArea.parseText().replace('|', '')
         for character in text:
             press_key_fast(character)
             print("TYPING... "+str(character))
@@ -204,7 +206,7 @@ def closeTheBrackets(arg):
         textArea = ScreenGrab(0, 245, 700, 100)
         textArea.flipFrame()
         # textArea.saveFrame("BRACKETS")
-        text = textArea.parseText()
+        text = textArea.parseText().replace('|', '')
         print("BRACKETS : "+text)
         for character in text:
             # press_key(character) # Might need a bit more delay!
@@ -246,9 +248,9 @@ def slashGaurd(arg):
     detectedState = checkMiniGameState()
     while detectedState is "SLASHING_STATE":
         # Check if it says attack
-        attackImg = ScreenGrab(0, 190, 350, 55);
+        attackImg = ScreenGrab(0, 230, 350, 55);
         attackStr = attackImg.parseText().lower()
-        # attackImg.saveImage("ATTACK")
+        attackImg.saveImage("ATTACK")
         if "attack" in attackStr:
             print("Attacking")
             # press_key(keyboard.Key.enter)
@@ -285,12 +287,12 @@ def mines(arg):
     while detectedState is "MINES_STATE":
         minesStateImg = ScreenGrab(0, 160, 400, 65);
         minesState = minesStateImg.parseText().lower()
-        minesStateImg.saveImage("Mine STATE")
+        # minesStateImg.saveImage("Mine STATE")
         # Determine whether we are "remembering" the mines positions, or "marking" them.
         # TODO: Memorize & mark!
         minesImg = ScreenGrab(0, 225, 300, 295);
         minesText = minesImg.parseText()
-        minesImg.saveImage("MINES ")
+        # minesImg.saveImage("MINES ")
         # print("MINES: "+minesText)
         if "remember" in minesState:
             # store matches in minePositions!
