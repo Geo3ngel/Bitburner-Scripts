@@ -46,8 +46,8 @@ class ScreenGrab:
         return text
     
     def flipFrame(self):
-        flipped = cv2.flip(self.frame, 1)
-        self.frame = flipped
+        flipped = cv2.flip(self.img_np, 1)
+        self.frame = cv2.cvtColor(flipped, cv2.COLOR_BGR2GRAY)
         
     def directionMatch(self):
         for direction in arrowMap.keys():
@@ -56,6 +56,7 @@ class ScreenGrab:
             threshold = 0.8
             loc = np.where(res >= threshold)
             for pt in zip(*loc[::-1]):
+                print("PT:"+str(pt))
                 if pt != None:
                     return direction;
         return -1 # No match
