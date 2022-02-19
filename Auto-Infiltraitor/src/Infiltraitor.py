@@ -139,7 +139,7 @@ def typeItBackwards(arg):
     detectedState = checkMiniGameState()
     while detectedState is "TYPE_BACKWARDS_STATE":
         # Grab Backwards text area
-        textArea = ScreenGrab(400, 170, 800, 250)
+        textArea = ScreenGrab(400, 180, 800, 150)
         textArea.flipFrame()
         textArea.saveFrame("BACKWARDS")
         text = textArea.parseText().replace('|', '').strip()
@@ -206,7 +206,7 @@ def closeTheBrackets(arg):
     # Check we are still in this state
     detectedState = checkMiniGameState()
     while detectedState is "CLOSE_BRACKETS_STATE":
-        textArea = ScreenGrab(0, 215, 700, 120)
+        textArea = ScreenGrab(0, 215, 700, 130)
         textArea.flipFrame()
         textArea.saveFrame("BRACKETS")
         text = textArea.parseText().replace('|', '')
