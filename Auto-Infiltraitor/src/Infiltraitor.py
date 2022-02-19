@@ -90,10 +90,10 @@ complimentsList = [
     
 def checkCompleteState():
     # TODO: Update to actually check/verify we are in the completed state
-    stateCheck = ScreenGrab(0, 0, 100, 100);
+    stateCheck = ScreenGrab(0, 20, 100, 80);
     # Parse some string?
     stateText = stateCheck.parseText().lower();
-    if "reputation" is stateText:
+    if "successful" is stateText:
         # TODO Select faction we want to give rep to (Might change to do intelligently LATER)
         # Select give Rep
         return ("COMPLETED_STATE", "Finished")
@@ -173,20 +173,22 @@ def complimentTheGuard(arg):
     while detectedState is "COMPLIMENT_GAURD_STATE":
         # Read current message
         textArea = ScreenGrab(0, 285, 200, 35)
-        text = textArea.parseText().lower()
-        textArea.saveImage("GUARD")
-        print("Guard compliment: "+text)
-        currentMsg = textArea.parseText()
+        # text = textArea.parseText().lower()
+        # textArea.saveImage("GUARD")
+        # print("Guard compliment: "+text)
+        currentMsg = textArea.parseText().lower()
         # Determine whether to accept or press up
         if currentMsg in complimentsList:
             # Hit Enter
-            press_key(keyboard.Key.space)
+            press_key_fast(keyboard.Key.space)
         else:
             # Hit up
-            press_key(keyboard.Key.up)
+            press_key_fast(keyboard.Key.up)
         detectedState = checkMiniGameState()
     return (detectedState, None)
 
+# TODO: NOTE: I'm pretty sure we don't actually have to do this intelligently.
+# Could probably just spam ')', '>', ']', '}' keys and do just fine.
 def closeTheBrackets(arg):
     print("Entered Brackets Minigame")
     # Check we are still in this state
@@ -196,7 +198,7 @@ def closeTheBrackets(arg):
         textArea.flipFrame()
         # textArea.saveFrame("BRACKETS")
         text = textArea.parseText()
-        # print("BRACKETS : "+text)
+        print("BRACKETS : "+text)
         for character in text:
             # press_key(character) # Might need a bit more delay!
             press_key_fast(character)
@@ -252,7 +254,7 @@ def cheatCode(arg):
     while detectedState is "CHEAT_CODE":
         # Process state
         # Check if it says attack
-        direction = ScreenGrab(0, 180, 55, 60); # TODO: Need to get all Arrows!
+        direction = ScreenGrab(0, 230, 55, 60); # TODO: Need to get all Arrows!
         directionStr = direction.directionMatch()
         print("DIRECTION: "+str(directionStr))
         if directionStr is -1:
@@ -267,17 +269,16 @@ def cheatCode(arg):
 def mines(arg):
     print("Entered Mines Minigame")
     # Check we are still in this state
+    time.sleep(.1)
     detectedState = checkMiniGameState()
     minePositions = []
     while detectedState is "MINES_STATE":
-        # Process state
-        detectedState = checkMiniGameState()
-        minesStateImg = ScreenGrab(0, 140, 400, 50);
+        minesStateImg = ScreenGrab(0, 160, 400, 65);
         minesState = minesStateImg.parseText().lower()
         minesStateImg.saveImage("Mine STATE")
         # Determine whether we are "remembering" the mines positions, or "marking" them.
         # TODO: Memorize & mark!
-        minesImg = ScreenGrab(0, 230, 300, 300);
+        minesImg = ScreenGrab(0, 225, 300, 295);
         minesText = minesImg.parseText()
         minesImg.saveImage("MINES ")
         # print("MINES: "+minesText)
@@ -286,6 +287,7 @@ def mines(arg):
             print("Memorizing!")
         else:
             print("Remembering")
+        detectedState = checkMiniGameState()
     return (detectedState, None)
 
 def startState(arg):
