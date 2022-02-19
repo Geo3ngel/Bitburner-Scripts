@@ -46,7 +46,29 @@ class ScreenGrab:
         return text
     
     def flipFrame(self):
-        self.frame = cv2.flip(self.frame)
+        flipped = cv2.flip(self.frame, 1)
+        self.frame = flipped
+        
+    def directionMatch(self):
+        for direction in arrowMap.keys():
+            # Compare this image to the arrow image
+            res = cv2.matchTemplate(self.frame, arrowMap[direction], cv2.TM_CCOEFF_NORMED)
+            threshold = 0.8
+            loc = np.where(res >= threshold)
+            for pt in zip(*loc[::-1]):
+                if pt != None:
+                    return direction;
+        return -1 # No match
+        
+    def getColorNums(self, colors):
+        colorNums = []
+        # use colorMap to map colors to actual rgb values
+        for color in colors:
+            # mask img_np w/ each relevant color
+            self.img_np
+            # detect each "Blurb" location, and divide it to find it's column num!
+            colorMap[color]
+        return colorNums
     
     def displayFrame(self):
         while True:
