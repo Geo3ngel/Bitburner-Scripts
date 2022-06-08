@@ -9,6 +9,7 @@ const LVL = 0;
 const RAM = 1;
 const CORE = 2;
 const DEATH_MSG = "AUTO_NET"
+const SERVER_MODIFIER = 0.2;
 var serverIter = 0;
 var maxServersPurchased = false;
 
@@ -197,14 +198,14 @@ export async function coreUpgradeProfit(currentLevel, currentRam, currentLevelCo
 async function checkServerPurchase(ns) {
 	let serverCost = ns.getPurchasedServerCost(MAX_SERVER_RAM);
 	let purchaseNodeCost = ns.hacknet.getPurchaseNodeCost();
-	if (serverCost < purchaseNodeCost) {
+	if ((serverCost * SERVER_MODIFIER) < purchaseNodeCost) {
 		return true;
 	}
 	return false;
 }
 
 async function purchaseServer(ns) {
-
+	let serverCost = ns.getPurchasedServerCost(MAX_SERVER_RAM);
 	if (serverCost < ns.getServerMoneyAvailable(HOME)) {
 		let serverName = `alpha-${serverIter}`;
 		while (ns.serverExists(serverName)) {
