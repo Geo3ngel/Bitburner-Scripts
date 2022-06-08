@@ -198,30 +198,35 @@ export async function coreUpgradeProfit(currentLevel, currentRam, currentLevelCo
 async function checkServerPurchase(ns) {
 	let serverCost = ns.getPurchasedServerCost(MAX_SERVER_RAM);
 	let purchaseNodeCost = ns.hacknet.getPurchaseNodeCost();
-	if ((serverCost * SERVER_MODIFIER) < purchaseNodeCost) {
+	if ((serverCost * SERVER_MODIFIER) < purchaseNodeCost && !maxServersPurchased) {
 		return true;
 	}
 	return false;
 }
 
 async function purchaseServer(ns) {
-	let serverCost = ns.getPurchasedServerCost(MAX_SERVER_RAM);
-	if (serverCost < ns.getServerMoneyAvailable(HOME)) {
+
+	// Set flag to disable future server purchase attempts
+	if (ns.getPurchasedServerLimit() <= ns.getPurchasedServers().length) {
+		maxServersPurchased = true;
+		await ns.print(`Server capactity maxxed!`)
+		return;
+	}
+
+	let serverCost = await ns.getPurchasedServerCost(MAX_SERVER_RAM);
+	let bal = await ns.getServerMoneyAvailable(HOME)
+	if (serverCost < bal) {
 		let serverName = `alpha-${serverIter}`;
-		while (ns.serverExists(serverName)) {
+		while (await ns.serverExists(serverName)) {
 			serverIter++;
 			serverName = `alpha-${serverIter}`;
 		}
 		await ns.purchaseServer(serverName, MAX_SERVER_RAM);
 		await ns.print(`PURCHASED: ${serverName}`)
 		await infectVulnerableServer(ns, serverName);
-		// Set flag to disable future server purchase attempts
-		if (ns.getPurchasedServerLimit() <= ns.getPurchasedServers().length) {
-			maxServersPurchased = true;
-			ns.print(`Server capactity maxxed!`)
-		}
+
 	} else {
 		// Unable to purchase server
-		ns.print(`Saving for server purchase...`)
+		await ns.print(`Saving for server purchase...`)
 	}
 }
