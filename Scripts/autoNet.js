@@ -10,8 +10,11 @@ const RAM = 1;
 const CORE = 2;
 const DEATH_MSG = "AUTO_NET"
 var serverIter = 0;
+var maxServersPurchased = false;
 
 export async function main(ns) {
+	ns.disableLog('sleep');
+	ns.disableLog('getServerMoneyAvailable');
 	let paused = false;
 	while (ns.hacknet.numNodes() < ns.hacknet.maxNumNodes()) {
 		switch (ns.readPort(AUTO_NODE_INBOUND_PORT)) {
@@ -27,7 +30,10 @@ export async function main(ns) {
 		}
 
 		if (!paused) {
-			if (!checkServerPurchase(ns)) {
+			if (await checkServerPurchase(ns)) {
+				// Attempt purchase
+				purchaseServer(ns);
+			} else { // Buy & upgrade nodes
 				let newNodeRatio = await calcNewNodeValueRatio(ns);
 
 				// Find highest ratio from all current nodes!
@@ -101,8 +107,6 @@ export async function main(ns) {
 							ns.print("No best property chosen?")
 					}
 				}
-			} else {
-				ns.print(`Saving for server purchase...`)
 			}
 		}
 		await ns.sleep("50");
@@ -128,7 +132,7 @@ export async function findWeakestNode(ns) {
 /// These functions translate the cost of the next upgrade to a ratio for comparison to see what is worth saving for
 ///
 export async function calcLevelUpgradeValueRatio(ns, nodeNum) {
-	let cost = ns.hacknet.getLevelUpgradeCost(nodeNum, 1);
+	let cost = await ns.hacknet.getLevelUpgradeCost(nodeNum, 1);
 	let lvl = await ns.hacknet.getNodeStats(nodeNum).level;
 	let ram = await ns.hacknet.getNodeStats(nodeNum).ram;
 	let core = await ns.hacknet.getNodeStats(nodeNum).cores;
@@ -139,7 +143,7 @@ export async function calcLevelUpgradeValueRatio(ns, nodeNum) {
 }
 
 export async function calcRamUpgradeValueRatio(ns, nodeNum) {
-	let cost = ns.hacknet.getRamUpgradeCost(nodeNum, 1);
+	let cost = await ns.hacknet.getRamUpgradeCost(nodeNum, 1);
 	let lvl = await ns.hacknet.getNodeStats(nodeNum).level;
 	let ram = await ns.hacknet.getNodeStats(nodeNum).ram;
 	let core = await ns.hacknet.getNodeStats(nodeNum).cores;
@@ -149,7 +153,7 @@ export async function calcRamUpgradeValueRatio(ns, nodeNum) {
 }
 
 export async function calcCoreUpgradeValueRatio(ns, nodeNum) {
-	let cost = ns.hacknet.getCoreUpgradeCost(nodeNum, 1);
+	let cost = await ns.hacknet.getCoreUpgradeCost(nodeNum, 1);
 	let lvl = await ns.hacknet.getNodeStats(nodeNum).level;
 	let ram = await ns.hacknet.getNodeStats(nodeNum).ram;
 	let core = await ns.hacknet.getNodeStats(nodeNum).cores;
@@ -190,23 +194,33 @@ export async function coreUpgradeProfit(currentLevel, currentRam, currentLevelCo
 ///
 ///	Case where we absolutely should just buy a new server instead!
 /// Returns true if it is saving up for a purchase
-function checkServerPurchase(ns) {
+async function checkServerPurchase(ns) {
 	let serverCost = ns.getPurchasedServerCost(MAX_SERVER_RAM);
-	if (serverCost < ns.hacknet.getPurchaseNodeCost()
-		&& ns.getPurchasedServerLimit() > ns.getPurchasedServers().length) {
-		// Attempt purchase
-		if (serverCost < ns.getServerMoneyAvailable(HOME)) {
-			let serverName = `alpha-${serverIter}`;
-			while (ns.serverExists(serverName)) {
-				serverIter++;
-				serverName = `alpha-${serverIter}`;
-			}
-			ns.purchaseServer(serverName, MAX_SERVER_RAM);
-			ns.print(`PURCHASED: ${serverName}`)
-			infectVulnerableServer(ns, serverName);
-		} else {
-			return true;
-		}
+	let purchaseNodeCost = ns.hacknet.getPurchaseNodeCost();
+	if (serverCost < purchaseNodeCost) {
+		return true;
 	}
 	return false;
+}
+
+async function purchaseServer(ns) {
+
+	if (serverCost < ns.getServerMoneyAvailable(HOME)) {
+		let serverName = `alpha-${serverIter}`;
+		while (ns.serverExists(serverName)) {
+			serverIter++;
+			serverName = `alpha-${serverIter}`;
+		}
+		await ns.purchaseServer(serverName, MAX_SERVER_RAM);
+		await ns.print(`PURCHASED: ${serverName}`)
+		await infectVulnerableServer(ns, serverName);
+		// Set flag to disable future server purchase attempts
+		if (ns.getPurchasedServerLimit() <= ns.getPurchasedServers().length) {
+			maxServersPurchased = true;
+			ns.print(`Server capactity maxxed!`)
+		}
+	} else {
+		// Unable to purchase server
+		ns.print(`Saving for server purchase...`)
+	}
 }
