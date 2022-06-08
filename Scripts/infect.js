@@ -1,13 +1,18 @@
 import {
-	WEAKEN, GROW, HACK
+	WEAKEN, GROW, HACK,
+	SERVER_LIST, PURCHASED_SERVER_LIST
 } from "lib/customConstants.js";
-import { getAllServers } from "lib/util.js"
 
 export async function main(ns) {
-	var totalServerList = getAllServers(ns);
+	// var totalServerList = getAllServers(ns);
+	var totalServerList = SERVER_LIST + PURCHASED_SERVER_LIST
 	// Go through all servers & infect them!
 	for (let i = 0; i < totalServerList.length; i++) {
-		await infectVulnerableServer(ns, totalServerList[i]);
+		try {
+			await infectVulnerableServer(ns, totalServerList[i]);
+		} catch {
+			ns.print(`Server ${totalServerList[i]} not in existance yet.`)
+		}
 	}
 }
 
