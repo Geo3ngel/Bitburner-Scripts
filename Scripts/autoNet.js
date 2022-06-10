@@ -33,7 +33,7 @@ export async function main(ns) {
 		if (!paused) {
 			if (await checkServerPurchase(ns)) {
 				// Attempt purchase
-				purchaseServer(ns);
+				await purchaseServer(ns);
 			} else { // Buy & upgrade nodes
 				let newNodeRatio = await calcNewNodeValueRatio(ns);
 
