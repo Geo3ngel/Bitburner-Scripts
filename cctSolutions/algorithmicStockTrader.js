@@ -7,12 +7,14 @@ export async function main(ns) {
 	var answer = null;
 	switch (version) {
 		case 1:
+			ns.print("Case 1")
 			var answer = await solve(ns, data)
 			var result = ns.codingcontract.attempt(answer, contract, host)
 			ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 			await ns.sleep(100000)
 			break;
 		case 2:
+			ns.print("Case 2")
 			answer = await solveV2(ns, data)
 			// var result = ns.codingcontract.attempt(answer, contract, host)
 			// ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
@@ -26,7 +28,9 @@ export async function main(ns) {
 			ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 
 			ns.print(`Answer: ${answer}`)
-			await ns.sleep(10000)
+			if (!result) {
+				await ns.sleep(1000000)
+			}
 			break;
 	}
 	if (answer != null) {
@@ -59,8 +63,21 @@ function buildNodeList(data) {
 	return nodeList
 }
 
+// TODO: Fix error case?
 async function solve(ns, data) {
-	var nodeList = buildNodeList(data)
+	var nodeList = [] // value node index
+
+	// Build node array of all index stop/start values! (2D array!)
+	// for s (start index)
+	// for e (end index)
+	for (let s = 0; s < data.length; s++) {
+		for (let e = s; e < data.length; e++) {
+			let val = data[e] - data[s]
+			if (val > 0) {
+				nodeList.push(new node(s, e, data[e] - data[s]))
+			}
+		}
+	}
 	// get the node w/ the highest value
 	var mostValuableNode = nodeList[0]
 	for (let i = 1; i < nodeList.length; i++) {
@@ -68,7 +85,7 @@ async function solve(ns, data) {
 			mostValuableNode = nodeList[i]
 		}
 	}
-	ns.print(`NodeList: ${nodeList}`)
+	printNodeList(ns, nodeList)
 	ns.print(`Most valuable Node: ${mostValuableNode}`)
 	ns.print(`Value: ${mostValuableNode.getVal()}`)
 	return mostValuableNode.getVal()
