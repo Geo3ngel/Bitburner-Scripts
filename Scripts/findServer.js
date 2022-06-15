@@ -4,14 +4,15 @@
 
 /**
  * NOTABLE SERVERS TO SEARCH FOR:
- * - w0rld_d43m0n
+ * - The-Cave (Must be backdoored before w0rld_d43m0n spawns)
+ * - w0r1d_d43m0n
  */
 
 /** @param {NS} ns */
 let traversedServers = ["home"]
 export async function main(ns) {
     ns.disableLog('ALL');
-    let target = "icarus"//"icarus" // TODO: Example server, use ARGS input
+    let target = "The-Cave"//"icarus" // TODO: Example server, use ARGS input
     let jumps = 10
     let path = []
     // DFS to find the server, keeping track of the parent server as a list.
@@ -28,11 +29,12 @@ export async function main(ns) {
         }
     }
     // Then reduce to minimum servers to jump
-    if (path.length <= 0) {
+    if (path.length <= 1) {
         ns.print(`Couldn't find ${target}; ${path.length}`)
     } else {
         printMinPath(ns, jumps, path)
     }
+    await ns.sleep(5000)
 }
 
 function printMinPath(ns, jumps, path) {
