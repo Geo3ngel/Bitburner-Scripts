@@ -3,44 +3,34 @@ export async function main(ns) {
 	var host = ns.args[1];
 	var version = ns.args[2];
 	var data = ns.codingcontract.getData(contract, host)
-	// var answer = await solveV2(ns, data)
 	var answer = null;
 	switch (version) {
 		case 1:
 			ns.print("Case 1")
-			var answer = await solve(ns, data)
-			var result = ns.codingcontract.attempt(answer, contract, host)
-			ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
-			await ns.sleep(100000)
+			answer = await solve(ns, data)
 			break;
 		case 2:
 			ns.print("Case 2")
 			answer = await solveV2(ns, data)
-			// var result = ns.codingcontract.attempt(answer, contract, host)
-			// ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 			break;
 		case 3:
+			ns.print("Case 3")
+			answer = await solveV3(ns, data)
 			break;
 		case 4:
 			ns.print("Case 4")
-			var answer = await solveV4(ns, data)
-			var result = ns.codingcontract.attempt(answer, contract, host)
-			ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
-
-			ns.print(`Answer: ${answer}`)
-			if (!result) {
-				await ns.sleep(1000000)
-			}
+			answer = await solveV4(ns, data)
 			break;
 	}
 	if (answer != null) {
-		// var result = ns.codingcontract.attempt(answer, contract, host)
-		// ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
+		var result = ns.codingcontract.attempt(answer, contract, host)
+		ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
+		ns.print(`Answer: ${answer}`)
+		if (!result) {
+			await ns.sleep(10000)
+		}
 	}
 	ns.print(`Answer: ${answer}`)
-	// await ns.sleep(10000)
-	// var result = ns.codingcontract.attempt(answer, contract, host)
-	// ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 }
 
 function buildNodeList(data) {
@@ -63,7 +53,6 @@ function buildNodeList(data) {
 	return nodeList
 }
 
-// TODO: Fix error case?
 async function solve(ns, data) {
 	var nodeList = [] // value node index
 
@@ -85,7 +74,7 @@ async function solve(ns, data) {
 			mostValuableNode = nodeList[i]
 		}
 	}
-	printNodeList(ns, nodeList)
+	printNodeList(ns, nodeList, data)
 	ns.print(`Most valuable Node: ${mostValuableNode}`)
 	ns.print(`Value: ${mostValuableNode.getVal()}`)
 	return mostValuableNode.getVal()
@@ -136,20 +125,27 @@ async function solveV2(ns, data) {
 	return totalProfit;
 }
 
+// function kOverlapNodes(nodeList){
+
+// }
+
 // Returns true if nodes overlap
 function nodesOverlap(ns, a, b) {
 	let a_start = a.getStartIndex()
 	let b_start = b.getStartIndex()
 	let a_end = a.getEndIndex()
 	let b_end = b.getEndIndex()
+
+	// If X is within Y at all, overlap = true.
+	// if(a_start < b_start && a_end < b_start)
 	if (a_start <= b_end && a_start >= b_start) {
-		return true;
-	}
-	if (a_end <= b_end && a_end >= b_start) {
 		return true;
 	}
 	if (b_start <= a_end && b_start >= a_start) {
 		return true
+	}
+	if (a_end <= b_end && a_end >= b_start) {
+		return true;
 	}
 	if (b_end <= a_end && b_end >= a_start) {
 		return true;
@@ -165,10 +161,14 @@ function combineNodeListValues(nodeList) {
 	return value;
 }
 
-function printNodeList(ns, nodeList) {
-	ns.print(`Type of nodeList: ${typeof (nodeList)}`)
+function printNodeList(ns, nodeList, data) {
 	nodeList.forEach(
-		node => ns.print(`S: ${node.getStartIndex()} E: ${node.getEndIndex()} V:${node.getVal()}`))
+		node => ns.print(`S: ${node.getStartIndex()};${data[node.getStartIndex()]} E: ${node.getEndIndex()};${data[node.getEndIndex()]} V:${node.getVal()}`))
+	ns.print(`Node List Length: ${nodeList.length}`)
+}
+
+async function solveV3(ns, data) {
+	return solveV4(ns, [2, data])
 }
 
 // The first element is an integer k. 
@@ -208,13 +208,14 @@ async function solveV4(ns, data) {
 	let non_Overlapping_K_NodeLists = []
 	for (let i = 0; i < nodeList.length; i++) {
 		let noOverlapNodeList = [nodeList[i]]
-		for (let j = 0; j < nodeList.length; j++) { // Might have to set j to 0 initially...
-			if (j == i) { continue }
+		for (let j = i; j < nodeList.length; j++) { // Might have to set j to 0 initially...
+			if (j == i && j) { continue }
 			// Overlap check for current node list contents
 			let doesNotOverlap = true
 			for (let p = 0; p < noOverlapNodeList.length; p++) {
 				if (nodesOverlap(ns, noOverlapNodeList[p], nodeList[j])) {
 					doesNotOverlap = false
+					ns.print(`Node A: (${nodeList[i].getStartIndex()},${nodeList[i].getEndIndex()}) & B: (${nodeList[p].getStartIndex()},${nodeList[p].getEndIndex()}) Overlap.`)
 					// Should not include this node in the list!
 					break
 				}
@@ -223,6 +224,7 @@ async function solveV4(ns, data) {
 				// If the nodes do not overlap, add the node!
 				noOverlapNodeList.push(nodeList[j])
 				if (noOverlapNodeList.length == k) {	// Early termination clause
+					// ns.print(`TERMINATED EARLY: ${k}:${noOverlapNodeList.length}`)
 					break; // We have enough to compare to others for the top K!
 				}
 			}
@@ -236,11 +238,16 @@ async function solveV4(ns, data) {
 	for (let i = 0; i < non_Overlapping_K_NodeLists.length; i++) {
 
 		let val = combineNodeListValues(non_Overlapping_K_NodeLists[i])
+		if (non_Overlapping_K_NodeLists[i].length > 8) {
+			ns.print(`Val: ${val}, Len: ${non_Overlapping_K_NodeLists[i].length}`)
+
+		}
 		if (highestValue < val) {
 			k_nodes = non_Overlapping_K_NodeLists[i]
 			highestValue = val
 		}
 	}
-	printNodeList(ns, k_nodes)
+	printNodeList(ns, k_nodes, prices)
+	ns.print(`K nodes: ${k_nodes.length}. Data Length: ${data[1].length}`)
 	return highestValue // Pick the highest value!
 }
