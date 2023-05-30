@@ -191,7 +191,7 @@ async function multiStaggeredHack(ns) {
             else {
                 if (!serverMap.get(server).isPriming()) {
                     ns.print(`Is Priming: ${server}`)
-                    primeServer(ns, server);
+                    await primeServer(ns, server);
                 } else {
                     ns.print("Already Priming!");
                 }
@@ -381,7 +381,7 @@ async function primeServer(ns, server) {
         // Grow money!
         let growthMultiplier = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
         let growthThreads = Math.ceil(ns.growthAnalyze(server, growthMultiplier, cores));
-        securityIncrease = ns.growthAnalyzeSecurity(growthThreads, server);
+        let securityIncrease = ns.growthAnalyzeSecurity(growthThreads, server);
 
         let weakenGrowthThreads = Math.ceil(securityIncrease / (coreBonus * SERVER_WEAKEN_AMOUNT));
         distributeAttackLoad(ns, server, GROW, growthThreads, 0);
