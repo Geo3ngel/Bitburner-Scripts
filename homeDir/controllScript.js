@@ -22,7 +22,7 @@ import {
     HOME,
     WEAKEN, GROW, HACK, SERVER_WEAKEN_AMOUNT,
     SERVER_LIST
-} from "lib/customConstants.js"; ``
+} from "lib/customConstants.js";
 import {
     weakenTime, growTime, hackTime,
     growPercent, hackPercent
@@ -182,18 +182,19 @@ async function multiStaggeredHack(ns) {
         let server = hackableServers[i]
         if (server != undefined) {
             let primed = isPrimed(ns, server);
+            let growthRate = ns.getServerGrowth(server)
+            ns.print(`Growth Rate: ${growthRate}`);
             ns.print(`Primed status: ${primed}. MAX: ${ns.getServerMaxMoney(server)}, CURRENT: ${ns.getServerMoneyAvailable(server)}`)
             if (primed) {
                 ns.print(`Is Primed! Attacking: ${server}`)
                 await batchAttack(ns, server);
-                // attackServer(ns, server);
             }
             else {
                 if (!serverMap.get(server).isPriming()) {
-                    ns.print(`Is Priming: ${server}`)
+                    await ns.print(`Is Priming: ${server}`)
                     await primeServer(ns, server);
                 } else {
-                    ns.print("Already Priming!");
+                    // await ns.print("Already Priming!");
                 }
             }
         }
@@ -373,103 +374,24 @@ async function primeServer(ns, server) {
         // Pre-growth weakening necessary!
         let securityDiff = currentSecurityLvl - minSecurityLvl;
         let weakenThreads = Math.ceil(securityDiff / (coreBonus * SERVER_WEAKEN_AMOUNT));
-        distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 0);
-        await ns.asleep(weakenTime);
+        distributeLoad(ns, server, WEAKEN, weakenThreads, 0);
+        ns.asleep(weakenTime); // Try breaking this out into it's own funciton to see if that helps...
+        ns.print("TEST")
     }
 
     if (currentMoney < maxMoney) {
         // Grow money!
-        let growthMultiplier = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
+        let growthRate = ns.getServerGrowth(server)
+        let growthMultiplier = (maxMoney / currentMoney);//*(1/growthRate);
         let growthThreads = Math.ceil(ns.growthAnalyze(server, growthMultiplier, cores));
         let securityIncrease = ns.growthAnalyzeSecurity(growthThreads, server);
 
         let weakenGrowthThreads = Math.ceil(securityIncrease / (coreBonus * SERVER_WEAKEN_AMOUNT));
-        distributeAttackLoad(ns, server, GROW, growthThreads, 0);
-        distributeAttackLoad(ns, server, WEAKEN, weakenGrowthThreads, 0);
+        distributeLoad(ns, server, GROW, growthThreads, 0);
+        distributeLoad(ns, server, WEAKEN, weakenGrowthThreads, 0);
         await ns.asleep(weakenTime);
     }
 
-
-    serverMap.get(server).setPriming(false);
-}
-
-// TODO: Try splitting this out into another class at some point?
-// NOTE: We WANT the prime Server to be BLOCKING of the other shit!
-async function oldPrimeServer(ns, server) {
-    /**
-     * PRIMING server.
-     * OLD: Growing to max, and weakening to min
-     * 
-     * NEW: Weaking to min, Grow to max, Weaking to min!
-     * - Check first if it's already at it's weakest!
-     */
-
-    // Set Priming! (Avoids duplicate priming batches for the server)
-    serverMap.get(server).setPriming(true);
-    let minSecurityLvl = ns.getServerMinSecurityLevel(server);
-    let currentSecurityLvl = ns.getServerSecurityLevel(server);
-
-    // NOTE: Time it takes to do a GROW/WEAKEN/HACK operation changes based on the security level (And other bonuses?)
-    // When a GROW/WEAKEN/HACK task is started at a specific security level, it's TIME is set from that security level!
-    // I want to aim to exploit that!
-    // Priming Should set the server to maxMoney and minSecurity if possible.
-    // Then future batches will be able to be completed orders of magnitudes faster since they will always all run
-    // on minimum execute time!
-
-    // PRIMING Though might need to loop until it is ready!
-    // [] Server needs to be weakend from priming BEFORE triggering GROW!
-    // [] Server needs to wait to execute the next step for priming, so it dosen't use the current
-    // 		securityLvl 
-
-    // TODO: Use hackingformulas! https://github.com/danielyxie/bitburner/blob/dev/markdown/bitburner.hackingformulas.md
-
-    // ### OLD WORLD
-    ns.print(`PRIMING ${server}`);
-    let _server = ns.getServer(server);
-    let cores = ns.getServer(HOME).cpuCores;
-    let neededGrowthPercent = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
-
-    // TODO: Calculate this instead using growthAnalyze(), growthAnaluzeSecurity, and getServerGrowth()
-    let maxGrowThreads = Math.ceil(
-        Math.log10(neededGrowthPercent)
-        / Math.log10(growPercent(_server, 1, player, cores)) //ns.growthPercent(server, 1, player, cores))
-    );
-    let weakenThreads = ((ns.getServerSecurityLevel(server) - ns.getServerMinSecurityLevel(server)) + (maxGrowThreads * 0.004)) / 0.05
-
-    // let timeToGrow = growTime(_server, player);
-    let timeToGrow = Math.ceil(ns.getGrowTime(server));
-    // Sets timer delay to ensure weaken is completed only AFTER grow finishes.
-    // let weakenDelayTime = timeToGrow - timeToWeaken;
-    // if (weakenDelayTime < 0) { weakenDelayTime = 0; }
-
-    let maxMoney = ns.getServerMaxMoney(server);
-    let availalbeMoney = ns.getServerMoneyAvailable(server);
-    if (availalbeMoney < maxMoney) {
-        // Grow money
-        distributeAttackLoad(ns, server, GROW, maxGrowThreads, 0);
-    }
-
-    ns.print(`Sleeping for ${timeToGrow} while Growing!`)
-    // await ns.sleep(timeToGrow)
-    await ns.asleep(timeToGrow)
-
-    let minSecurity = ns.getServerMinSecurityLevel(server);
-    let securityLvl = ns.getServerSecurityLevel(server);
-    if (securityLvl > minSecurity) {
-        distributeAttackLoad(ns, server, WEAKEN, weakenThreads, 0/*weakenDelayTime*/);
-    }
-
-    let timeToWeaken = Math.ceil(ns.weakenTime(server));//weakenTime(ns.getServer(server), player);
-    ns.print(`Sleeping for ${timeToWeaken} while Weakening!`)
-    // await ns.sleep(timeToWeaken)
-    await ns.asleep(timeToWeaken)
-    /**
-     * Server is PRIMING
-     * - Mark the serverNode as PRIMING, and set the timestamp/time it will take for weakening+delay to complete!
-     */
-    // ns.print(`SET PRIMING ${server} scheduled to complete at: ${Date.now()+timeToWeaken + weakenDelayTime}`);
-    // serverMap.get(server).setPriming(0/*timeToWeaken + weakenDelayTime*/);
-    // Priming is completed for the given server!
     serverMap.get(server).setPriming(false);
 }
 
@@ -480,7 +402,7 @@ async function batchAttack(ns, server) {
     let weakenTime = ns.getWeakenTime(server);	// hackTime * 4;
 
     // ##### TO TUNE THIS VALUE!!! ##### \\
-    let profitPercent = 0.5;
+    let profitPercent = 0.1;
     const step = 25; // time delay in ms between each action!
     let cores = ns.getServer(HOME).cpuCores;
     const coreBonus = 1 + (cores - 1) / 16;
@@ -496,7 +418,7 @@ async function batchAttack(ns, server) {
     let weakenHackThreads = Math.ceil(securityIncrease / (coreBonus * SERVER_WEAKEN_AMOUNT));
 
     // ### GROW ###
-    // MaxMoney/CurrentMoney!
+    // IS this calc incorrect? Or is there only so much we can grow at a given time?
     let growthMultiplier = ns.getServerMaxMoney(server) / ns.getServerMoneyAvailable(server);
     let growthThreads = Math.ceil(ns.growthAnalyze(server, growthMultiplier, cores));
     securityIncrease = ns.growthAnalyzeSecurity(growthThreads, server);
@@ -508,13 +430,24 @@ async function batchAttack(ns, server) {
     let hackingWeakeningDelay = baseDelay; // hackingWeakening has no delay modifier
     let growthDelay = baseDelay + weakenTime - growTime + step;
     let growthWeakeningDelay = baseDelay + 2 * step;
-    baseDelay += weakenTime + 2 * step;
-    // ### POTENTIAL PROBLEM!! ###
-    // Will splitting these across servers cause issues with the calculated results? (It might not)
-    distributeAttackLoad(ns, server, HACK, hackThreads, hackingDelay);
-    distributeAttackLoad(ns, server, WEAKEN, weakenHackThreads, hackingWeakeningDelay);
-    distributeAttackLoad(ns, server, GROW, growthThreads, growthDelay);
-    distributeAttackLoad(ns, server, WEAKEN, weakenGrowthThreads, growthWeakeningDelay);
+    baseDelay = 2 * step;
+
+    // ### See if we have enough threads for the entire batch to run...
+    let threadedHackRam = hackThreads * ns.getScriptRam(HACK);
+    let hackWeakenRam = weakenHackThreads * ns.getScriptRam(WEAKEN);
+    let growthWeakenRam = weakenGrowthThreads * ns.getScriptRam(WEAKEN);
+    let growRam = growthThreads * ns.getScriptRam(GROW);
+    let batchRam = threadedHackRam + hackWeakenRam + growthWeakenRam + growRam;
+    let availableHostRam = calcHostRam(ns)
+
+    if (availableHostRam > batchRam) {
+        // ### POTENTIAL PROBLEM!! ###
+        // Will splitting these across servers cause issues with the calculated results? (It might not)
+        distributeLoad(ns, server, HACK, hackThreads, hackingDelay);
+        distributeLoad(ns, server, WEAKEN, weakenHackThreads, hackingWeakeningDelay);
+        distributeLoad(ns, server, GROW, growthThreads, growthDelay);
+        distributeLoad(ns, server, WEAKEN, weakenGrowthThreads, growthWeakeningDelay);
+    }
 }
 
 // TODO: Implement blocking feature for optimal flow!
@@ -522,7 +455,7 @@ async function batchAttack(ns, server) {
 // 				Should also note delay for next set of tasks to target for their completion! (Next Batch Offset)
 /// ### OLD WORLD ###
 async function attackServer(ns, server) {
-    ns.print("ATTACKING")
+    await ns.print("ATTACKING")
     let _server = ns.getServer(server);
     let cores = ns.getServer(HOME).cpuCores;
     // Should give the amount of threads needed to grow by 200%
@@ -546,7 +479,7 @@ async function attackServer(ns, server) {
     // 	delay = serverMap.get(server).getPrimingTimeStamp() - Date.now()
     // }
 
-    ns.print(`ATTACKING: ${server} w/ ${hackThreads} hack threads`)
+    await ns.print(`ATTACKING: ${server} w/ ${hackThreads} hack threads`)
     distributeAttackLoad(ns, server, HACK, hackThreads, delay);
     /**
      * PRIMING server.
@@ -567,9 +500,77 @@ async function attackServer(ns, server) {
 
     distributeAttackLoad(ns, server, GROW, growThreads, growDelay);
     distributeAttackLoad(ns, server, WEAKEN, weakenThreads, weakenDelay);
-    ns.print(`LAUNCHED ATTACK ON ${server}`)
+    await ns.print(`LAUNCHED ATTACK ON ${server}`)
+}
+/**
+ * v1 New World version of distributeAttackLoad!
+ * should ensure batch is evenly distributed! (Proportionally? or...?)
+ * - Should ideally use a messaging system, but that might be a v2 rework. 
+ */
+function distributeLoad(ns, server, script, threads, delay, queued = false) {
+    // TODO: Ensure batching is distributed evenly somehow...?
+    let scriptRam = ns.getScriptRam(script);
+    let remainingThreads = threads;
+    // TODO: Log estimated completion time to make sure they're sync'd?
+    ns.print(`Distributing: ${script} Targeting: ${server}`)
+    // TODO: Ideally this would go through vulnerableServers sorted by MAX Ram!
+    // 			- Control sorting of vulnerableServers before calling distributeLoad?
+    vulnerableServers.forEach(host => {
+        let maxHostRam = ns.getServerMaxRam(host);
+        let hostUsedRam = ns.getServerUsedRam(host);
+
+        // ### Short circuits
+        if (maxHostRam === 0 || remainingThreads < 1) {
+            return;
+        }
+
+        // Reserves some running space for the home server to execute other scripts!
+        if (host == HOME) {
+            maxHostRam -= homeReservedRam;
+        }
+        let remainingRam = (maxHostRam - hostUsedRam);
+
+        // ### Space Check
+        let availableHostThreads = Math.floor(remainingRam / scriptRam);
+        if (availableHostThreads >= 1) {
+            if (availableHostThreads > remainingThreads) {
+                availableHostThreads = remainingThreads;
+                remainingThreads -= 0;
+            } else {
+                remainingThreads -= availableHostThreads;
+            }
+            ns.exec(script, host, availableHostThreads, server, delay, randomValue());
+        }
+    })
+    if (queued) {
+        // reduce amount of threads from queued call??
+        // 	-Would it just be easier to requeue?
+        // TODO: Implement this after to see if it works better.
+    }
+    else if (remainingThreads > 0) {
+        ns.print(`Leftover Threads: ${remainingThreads} for ${script}`)
+        // If there are threads remaining here, we want to queue the task w/ Remaining threads!
+        // Shouldn't allow any more distributions to run while queue has any items!
+        //	- Enqueue this task for future running!
+        //	- prioritize that over any other task! (Set to current focus?)
+        //		- CAREFUL to ensure it isn't requeued!
+    }
 }
 
+function calcHostRam(ns) {
+    let totalAvailableRam = 0;
+    let maxHostRam;
+    let hostUsedRam;
+    let availableRam;
+    vulnerableServers.forEach(host => {
+        maxHostRam = ns.getServerMaxRam(host);
+        hostUsedRam = ns.getServerUsedRam(host);
+        availableRam = maxHostRam - hostUsedRam;
+        totalAvailableRam += availableRam;
+    })
+    return totalAvailableRam;
+}
+// TODO: Revamp this next! (It's dogshit. Use a fcking queue for batch tasks for the love of God!)
 function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { // Consider doing delays by time stamp?
     totalThreads = Math.floor(totalThreads);
     let scriptRam = ns.getScriptRam(script);
@@ -595,23 +596,24 @@ function distributeAttackLoad(ns, targetServer, script, totalThreads, delay) { /
         }
         remainingRam = (maxServerRam - serverUsedRam);
         threads = Math.floor(remainingRam / scriptRam);
-        // ns.print(`Threads: ${threads}`)
+        // TODO: Redo this dog shit. Need better handling for cases where I don't have enough ram to do all the distributing!
+        // 			Should absolutely use a queueing system!
+        // 			Maybe I should establish a bucket sizing set up too or something? Idk. Lot to thjink about here.
         if (threads > 0) {
             // Subtract threads from totalThreads value!
             if (threads > totalThreads) {
                 // Limit to only the needed amount!
                 threads = totalThreads;
+                if (threads < 1) {
+                    continue;
+                }
             }
             // ns.print(`Distributing ${threads} threads to ${host}`)
             totalThreads -= threads;
             ns.exec(script, host, threads, targetServer, delay, randomValue());
         }
-        if (totalThreads <= 0) {
-            // ns.print(`Distributed ${script} attack for ${targetServer} to: ${host}: COMPETED ALL THREADS! ${totalThreads}`)
-            return; // Done distributing the attack load!
-        }
         else {
-            // ns.print(`Distributed ${script} attack threads remaining: ${totalThreads}`)
+            return; // Done distributing the attack load!
         }
     }
 }
