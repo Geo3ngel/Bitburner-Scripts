@@ -3,32 +3,50 @@ export async function main(ns) {
 	var contract = ns.args[0];
 	var host = ns.args[1];
 	var data = ns.codingcontract.getData(contract, host)
-	var answer = await solve(ns, data)
+	ns.print(`data: ${data}`)
+	var answer = await solveSpiralOrder(ns, data)
+	ns.print(`Answer: ${answer}`)
 	var result = ns.codingcontract.attempt(answer, contract, host)
 	ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
 	ns.print(`RESULT: ${answer}`)
 }
 
-// Build it in a destructive manner!
-// just concatinate the north boundry to start
-// Pop off the remaining right side (if there is any left)
-// Pop off the last array & concat it to resultsArr
-// Shift off remaining left side values
-// Repeat until data.length == 0
+async function solveSpiralOrder(ns, matrix) {
+	// Trackers for index of current row/column
+	let top = 0;
+	let bottom = matrix.length - 1;
+	let left = 0;
+	let right = matrix[0].length - 1;
+	let result = []
 
-async function solve(ns, data) {
-	var resultArr = []
-	while (data.length > 0) {
-		let northernBorder = data.shift()
-		resultArr = resultArr.concat(northernBorder);
-		for (let i = 0; i < data.length; i++) {
-			resultArr.push(data[i].pop())
+	// for(top = 0; top <= bottom; )
+	while (top <= bottom && left <= right) {
+		// Traverse Top
+		for (let i = left; i <= right; i++) {
+			result.push(matrix[top][i])
 		}
-		resultArr = resultArr.concat(data.pop())
-		for (let i = data.length - 1; i > -1; i--) {
-			resultArr.push(data[i].shift())
+		top++;
+		// Traverse right column from top to bottom
+		for (let i = top; i <= bottom; i++) {
+			result.push(matrix[i][right]);
 		}
-		await ns.sleep(25)
+		right--;
+
+		if (top <= bottom) {
+			// Traverse bottom row from right to left
+			for (let i = right; i >= left; i--) {
+				result.push(matrix[bottom][i]);
+			}
+			bottom--;
+		}
+
+		if (left <= right) {
+			// Traverse left column from bottom to top
+			for (let i = bottom; i >= top; i--) {
+				result.push(matrix[i][left]);
+			}
+			left++;
+		}
 	}
-	return resultArr;
+	return result;
 }
