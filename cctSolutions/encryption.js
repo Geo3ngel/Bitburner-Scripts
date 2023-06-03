@@ -17,8 +17,16 @@ export async function main(ns) {
                 await ns.sleep(10000)
             }
             break;
-        case 2:
+        case 2: //solveVigenereCipher
             ns.print("Case 2")
+            var answer = await solveVigenereCipher(ns, data)
+            ns.print(`Answer: ${answer}`)
+            // TODO: Confirm this works!
+            // var result = ns.codingcontract.attempt(answer, contract, host)
+            // ns.toast(`Contract ${contract} on host ${host} SUCCEEDED: ${result}`)
+            // if (!result) {
+            // 	await ns.sleep(10000)
+            // }
             break;
         case 3:
             ns.print("Case 3")
@@ -53,4 +61,29 @@ async function solveCaesarCipher(ns, data) {
     }
 
     return encryptedMsg;
+}
+
+async function solveVigenereCipher(ns, data) {
+    let plaintext = data[0].toUpperCase();
+    let keyword = data[1].toUpperCase();
+    let cipherText = "";
+    // Expand out keyword to be length fo plaintext?
+    // Or just go over it in a loop?
+    for (let i = 0; i < plaintext.length; i++) {
+        let plaintextChar = plaintext[i];
+        let keywordChar = keyword[i % keyword.length];
+
+        if (plaintextChar == ' ') {
+            cipherText += ' '
+            continue;
+        }
+        const plaintextCharCode = plaintextChar.charCodeAt(0) - 65;
+        const keywordCharCode = keywordChar.charCodeAt(0) - 65;
+
+        const encryptedCharCode = (plaintextCharCode + keywordCharCode) % 26 + 65;
+        const encryptedChar = String.fromCharCode(encryptedCharCode);
+
+        cipherText += encryptedChar;
+    }
+    return cipherText;
 }
