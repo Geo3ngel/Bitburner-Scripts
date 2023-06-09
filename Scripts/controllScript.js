@@ -140,7 +140,7 @@ export async function main(ns) {
 			// ns.print(`Key: ${key}, ${controlCycle.size}`)
 			await value(ns);
 		}
-		await ns.sleep(10000);
+		await ns.sleep(25);
 	}
 
 	await ns.sleep(10000)
@@ -390,7 +390,7 @@ async function primeServer(ns, server) {
 		let securityDiff = currentSecurityLvl - minSecurityLvl;
 		let weakenThreads = Math.ceil(securityDiff / (coreBonus * SERVER_WEAKEN_AMOUNT));
 		distributeLoad(ns, server, WEAKEN, weakenThreads, 0);
-		ns.asleep(weakenTime); // Try breaking this out into it's own funciton to see if that helps...
+		await ns.asleep(weakenTime); // Try breaking this out into it's own funciton to see if that helps...
 	}
 
 	if (currentMoney < maxMoney) {
@@ -404,9 +404,9 @@ async function primeServer(ns, server) {
 		ns.print(`Growing by ${growthMultiplier} using ${growthThreads} threads.`)
 		distributeLoad(ns, server, GROW, growthThreads, 0);
 		distributeLoad(ns, server, WEAKEN, weakenGrowthThreads, 0);
-		ns.print("Should be asleep for ", weakenTime)
+		// ns.print("Should be asleep for ", weakenTime)
 		await ns.asleep(weakenTime);
-		ns.print("Awake now!")
+		// ns.print("Awake now!")
 	}
 
 	serverMap.get(server).setPriming(false);
