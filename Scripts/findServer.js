@@ -9,26 +9,26 @@
  */
 
 /** @param {NS} ns */
-let traversedServers = ["home"]
+let traversedServers = []
 export async function main(ns) {
     ns.disableLog('ALL');
-    let target = "The-Cave"//"icarus" // TODO: Example server, use ARGS input
-    let jumps = 10
-    let path = []
-    // DFS to find the server, keeping track of the parent server as a list.
-    let initialScan = await ns.scan();
-    for (let i = 0; i < initialScan.length; i++) {
-        // Trims out purchased servers
-        if (initialScan[i].includes("alpha-") && initialScan[i] !== "alpha-ent") {
-            continue
-        }
+    let jumps = 1
+    let target = "The-Cave"
 
-        path = await findServer(ns, initialScan[i], target)
-        if (path.includes(target)) {
-            break;
-        }
+    if (ns.args.length > 0) {
+        target = ns.args[0]
     }
-    // Then reduce to minimum servers to jump
+    if (ns.args.length > 1) {
+        jumps = ns.args[1]
+    }
+    ns.print(`Target: ${target}`)
+    ns.print(`Jumps: ${jumps}`)
+
+    // DFS to find the server, keeping track of the parent server as a list.
+    let server = ns.getHostname();
+    traversedServers = [server]
+    let path = await findServer(ns, server, target)
+
     if (path.length <= 1) {
         ns.print(`Couldn't find ${target}; ${path.length}`)
     } else {
@@ -48,6 +48,18 @@ function printMinPath(ns, jumps, path) {
         ns.print(`Connect to: ${path[iter]}`)
         iter += jumps
     }
+}
+
+function findServerPath(ns, target) {
+    // DFS to find the server, keeping track of the parent server as a list.
+    let server = ns.getHostname();
+    traversedServers = [server]
+    let path = await findServer(ns, server, target)
+
+    if (path.length <= 1) {
+        ns.print(`Couldn't find ${target}; ${path.length}`)
+    }
+    return path;
 }
 
 // Recursivly DFS through all server nodes!
