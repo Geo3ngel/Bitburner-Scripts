@@ -1,6 +1,7 @@
 import { connectTo } from "lib/util.js";
 import PriorityQueue from "lib/PriorityQueue.js";
 import ServerNode from "lib/ServerNode.js";
+import Phase from "lib/Phase.js";
 import {
     PAUSE, UNPAUSE, KILL,
     AUTO_NODE_INBOUND_PORT,
@@ -11,6 +12,7 @@ import {
     SERVER_MAX_GROWTH_RATE,
     SERVER_FORTIFY_AMOUNT,
     SERVER_LIST,
+    FULL_SERVER_LIST,
     EXPLOIT_CHECK,
     LVL_UP_CHECK,
     PRIME_ATTACK,
@@ -18,12 +20,15 @@ import {
     PURCHASE_EVENT_LIST,
     PURCHASING_EXPLOIT, PURCHASING_SERVER, PURCHASING_HACK_NET_NODE, PURCHASING_AUGMENTATION, PURCHASING_HOME_UPGRADE,
     BRUTE, FTP_CRACK, HTTP_WORM, REPLAY_SMTP, SQL_INJECT,
-    PURCHASE_PHASE
+    PURCHASE_PHASE,
+    TO_BACK_DOOR,
+    FACTIONS_TO_AUTOJOIN
 } from "lib/customConstants.js";
 import {
     disableLogs,
     distributeLoad,
     calcGrowthThreads,
+    isMyServer,
 } from "lib/util.js";
 /**
  * What should my new controlCycle look like? Should I even use one like this?
@@ -37,14 +42,17 @@ controlCycle.set(LVL_UP_CHECK, function (ns) { levelUpCheck(ns) });
 // // controlCycle.set(EVALUATE_TARGETS, function (ns) { primeHackableServers(ns) });
 controlCycle.set(PRIME_ATTACK, function (ns) { multiStaggeredHack(ns) });
 let purchasePhases = new Map();
+let currentPurchasePhase = null;
 
-serverMap = new Map();
+var serverMap;
 var vulnerableServers; // List of servers that have already been cracked (Possibly not hackable yet)
 var serversToExploit;
 var hackableServers;
 var notHackableServers;
 
 var hackingLvl;
+var baseDelay;
+var forceAttack = false;
 /**
  * Singularity docs: https://bitburner-beta.readthedocs.io/en/latest/netscript/netscriptsingularityfunctions.html#:~:text=The%20Singularity%20Functions%20are%20a,installing%20Augmentations%2C%20and%20creating%20programs.
  * 
@@ -54,7 +62,20 @@ var hackingLvl;
  * I want to be able to target an organization automatically based on the augs they have and buy them! 
  * @param {NS} ns */
 export async function main(ns) {
-    init(ns);
+    await init(ns);
+    ns.print("Hackable Servers: ", hackableServers)
+    ns.print("Vulnerable Servers: ", vulnerableServers)
+    ns.print("Servers To Exploit: ", serversToExploit)
+    ns.print("ServerMap key length: ", serverMap.entries())
+    // let keys = []
+    // for (let key of serverMap){
+    // 	keys.push(key)
+    // }
+    // ns.print(`ServerMap keys: ${keys}`)
+    // for (let [key, value] of serverMap.entries()) {
+    // 	ns.print(`ServerMap keys: ${key}`)
+    // }
+
     /**
      * ControlCycle is basically a setup loop for listeners!
      * Things to include in controlCycle
@@ -73,8 +94,9 @@ export async function main(ns) {
     while (running) {
         for (let [key, value] of controlCycle.entries()) {
             // ns.print(`Key: ${key}, ${controlCycle.size}`)
-            if (!blockedEvents.includes(key))
+            if (!blockedEvents.includes(key)) {
                 await value(ns);
+            }
         }
         await ns.sleep(25);
     }
@@ -83,23 +105,34 @@ export async function main(ns) {
     // ### Augmentation purchase automation!
 }
 
-function init(ns) {
+async function init(ns) {
+    // ################################
+    // TODO: Make a proper args parser.
+    if (ns.args.length > 0) {
+        forceAttack = true;
+    }
+    serverMap = new Map();
     disableLogs(ns);
     hackingLvl = 1;
+    baseDelay = 0;
     ns.exec("lib/infect.js", HOME, 1);
     countExploits(ns)
     initPurchasePhases(ns);
 
+    // Init of server catagory lists
     vulnerableServers = [HOME];
     hackableServers = [];
     serversToExploit = new PriorityQueue();
     notHackableServers = new PriorityQueue(); // Prioritized by min hacking level required
+
+    // Make a flat map of all servers to respective serverNode
     processServersToNodes(ns);
-    traverseServerNodes(ns, initServerNode, processServerNode)
+    await traverseServerNodes(ns, serverMap[HOME], processServerNode)
     resetServerNodesTraversalState(ns);
 
     // Should be re-run after every vulnerable server is added!
     sortVulnerableServersByFreeRam(ns);
+    ns.print("##########################\n#Initialization complete.#\n##########################")
 }
 
 /**
@@ -112,6 +145,7 @@ function init(ns) {
  * ################################################################################
  */
 async function purchasePhase(ns) {
+    // ns.print("In Purchase Phase")
     // PURCHASE_EVENT_LIST
     // PURCHASING_EXPLOIT, PURCHASING_SERVER, PURCHASING_HACK_NET_NODE, PURCHASING_AUGMENTATION,
     // Need some way of determining what I should focus on for this cycle...
@@ -122,11 +156,28 @@ async function purchasePhase(ns) {
     // For now, assume priority of purchasing exploits, then go for augmentations automatically.
     // Can always work in nodes later from autoNet. Same for Servers!
     // 		Do based on the rate distance from being able to afford augs we're targeting!
+    /**
+     * TODO: Cycle through purchase Phases!
+     * - intelligently shift from one to the next?
+     * 		- How to handle this kind of state management?
+     */
+    if (currentPurchasePhase !== null) {
+        currentPurchasePhase(ns);
+    }
+
 }
 
 function initPurchasePhases(ns) {
     if (availableExploits.length) {
+        currentPurchasePhase = function (ns) { tryBuyExploits(ns) }
         purchasePhases.set(PURCHASING_EXPLOIT, function (ns) { tryBuyExploits(ns) })
+        // Phase
+        purchasePhases.set(
+            PURCHASING_EXPLOIT,
+            new Phase(PURCHASING_EXPLOIT, function (ns) { tryBuyExploits(ns) }, [],
+                false,	// blocked
+                true, 	//active
+            ))
     }
     // ### Home server upgrade automation!
     //		- might do to move these to a version of my auto script?
@@ -134,6 +185,7 @@ function initPurchasePhases(ns) {
     // purchasePhases.set(PURCHASING_HOME_UPGRADE, function (ns) {tryBuyHomeUpgrade(ns)})
     // purchasePhases.set(PURCHASING_SERVER, function (ns) {tryBuyServer(ns)})
     // purchasePhases.set(PURCHASING_HACK_NET_NODE, function (ns) {tryBuyHackNetNode(ns)})
+    // purchase stock market access! (and api?)
 
     // purchasePhases.set(PURCHASING_AUGMENTATION, function (ns) {tryBuyAugmentation(ns)})
     // The idea is to switch between phases at will. Not necessarily entirely remove them once done, like control cycle.
@@ -216,23 +268,24 @@ export async function countExploits(ns) {
  */
 function processServersToNodes(ns) {
     // Converts flat map of hostnames to serverNodes
-    SERVER_LIST.forEach(server => {
-        serverToNode(server)
+    FULL_SERVER_LIST.forEach(server => {
+        serverToNode(ns, server)
     })
     // Sets serverNode's subServers to lists of serverNodes
-    SERVER_LIST.forEach(server => {
+    FULL_SERVER_LIST.forEach(server => {
         let subServerHostnames = ns.scan(server)
-        let subServers = []
+        let subServerNodes = []
         subServerHostnames.forEach(hostname => {
-            subServers.push(serverMap[hostname])
+            subServerNodes.push(serverMap[hostname])
         })
-        serverMap[server].setSubServers(subServers)
+        serverMap[server].setSubServers(subServerNodes)
     })
 }
 
 function serverToNode(ns, server) {
-    let serverNode = new ServerNode(server, ns.hasRootAccess(server), false);
-    serverMap.set(server, serverNode);
+    let root = ns.hasRootAccess(server);
+    let serverNode = new ServerNode(server, root, false);
+    serverMap[server] = serverNode;
 }
 
 /**
@@ -241,15 +294,20 @@ function serverToNode(ns, server) {
  * {@Param} toRun: function to be run for the given node uppon traversal!
  * traverseServerNodes(ns, initServerNode, processServerNode)
  */
-function traverseServerNodes(ns, serverNode, toRun) {
+async function traverseServerNodes(ns, serverNode, toRun) {
+    ns.print(`TRAVERSING => ${serverNode.getHostname()}`)
     let subServers = serverNode.getSubServers();
-    serverNode.setTraversed()
+    serverNode.setTraversed();
 
-    subServers.forEach(server => {
-        traverseServerNodes(ns, server, toRun)
-    })
-
-    toRun(ns, serverNode.getHostname());
+    for (let i = 0; i < subServers.length; i++) {
+        let subServer = subServers[i];
+        ns.print(`SUB	-> ${subServer.getHostname()} -> ${subServer.isTraversed()}`)
+        if (!subServer.isTraversed()) {
+            ns.print(`T -> ${subServer}`)
+            await traverseServerNodes(ns, subServer, toRun)
+        }
+    }
+    await toRun(ns, serverNode.getHostname());
 }
 
 /**
@@ -261,9 +319,10 @@ function resetServerNodesTraversalState(ns) {
     })
 }
 
-function processServerNode(ns, server) {
+async function processServerNode(ns, server) {
+    ns.print("Processing Server:", server)
     exploitServerNode(ns, server);
-    isHackable(ns, server);
+    await isHackable(ns, server);
 }
 
 /**
@@ -273,7 +332,6 @@ async function exploitServerNode(ns, server) {
     // Attempt to crack
     let exploited = exploitServer(ns, server);
 
-    log(ns, `Can't crack ${server} yet.`)
     if (exploited) {
         vulnerableServers.push(server);
         serverMap[server].setExploited();
@@ -285,8 +343,12 @@ async function exploitServerNode(ns, server) {
 
 async function isHackable(ns, server) {
     let reqHackingLvl = ns.getServerRequiredHackingLevel(server);
-    if (ns.getHackingLevel() >= reqHackingLvl && ns.hasRootAccess(server)) {
+    if (ns.getHackingLevel() >= reqHackingLvl && ns.hasRootAccess(server) && !isMyServer(server)) {
         hackableServers.push(server);
+        if (TO_BACK_DOOR.includes(server)) {
+            ns.print("BACKDOORING: ", server);
+            await backdoor(ns, server);
+        }
         return true;
     } else {
         notHackableServers.enqueue(server, reqHackingLvl);
@@ -296,12 +358,17 @@ async function isHackable(ns, server) {
 
 /**
  * ##########################################################################################
- * [] Connection routing/pathing for backdooring automagically
+ * Connects routing/pathing for backdooring automagically
+ * [] TODO: use exec to run backdoor on a seperate program so as to not block this one!
+* 		- communicate w/ port for blocking movements from the server/backdooring other servers?
+ * 			- I should test if I can connect to/start backdooring other servers simultanioustly...
+ * For now, we just limit auto-backdooring to faction only servers!
  * ##########################################################################################
  */
 async function backdoor(ns, server) {
-    connectTo(server);
+    await connectTo(ns, server);
     await ns.singularity.installBackdoor();
+    await ns.singularity.connect(HOME);
 }
 
 /**
@@ -415,7 +482,7 @@ async function primeServer(ns, server) {
     let cores = ns.getServer(HOME).cpuCores; //1
     let coreBonus = 1 + (cores - 1) / 16;
 
-    serverMap.get(server).setPriming(true);
+    serverMap[server].setPriming(true);
     let minSecurityLvl = ns.getServerMinSecurityLevel(server);
     let currentSecurityLvl = ns.getServerSecurityLevel(server);
     let currentMoney = ns.getServerMoneyAvailable(server);
@@ -437,8 +504,18 @@ async function primeServer(ns, server) {
     ns.print("Sleeping for:", (weakenTime * 2))
     await ns.asleep(weakenTime * 2);
     // Prevents the script from trying to prime this server again!
-    serverMap.get(server).setPrimed(true)
-    serverMap.get(server).setPriming(false);
+    serverMap[server].setPrimed(true)
+    serverMap[server].setPriming(false);
+}
+
+/**
+ * Calculates the increase in security from growing a server with a certain number of threads
+ * - Growth Threads
+ */
+function growthAnalyzeSecurity(growthThreads) {
+    let securityIncrease = 0;
+    securityIncrease = 2 * SERVER_FORTIFY_AMOUNT * growthThreads;
+    return securityIncrease;
 }
 
 async function batchAttack(ns, server) {
@@ -489,7 +566,7 @@ async function batchAttack(ns, server) {
     let availableHostRam = calcHostRam(ns)
 
     if (availableHostRam > batchRam) {
-        ns.print(`Distributing from ATTACK! MAX: ${ns.getServerMaxMoney(server)}, CURRENT: ${ns.getServerMoneyAvailable(server)}`)
+        // ns.print(`Distributing from ATTACK! MAX: ${ns.getServerMaxMoney(server)}, CURRENT: ${ns.getServerMoneyAvailable(server)}`)
         distributeLoad(ns, server, HACK, hackThreads, hackingDelay, vulnerableServers);
         distributeLoad(ns, server, WEAKEN, weakenHackThreads, hackingWeakeningDelay, vulnerableServers);
         distributeLoad(ns, server, GROW, growthThreads, growthDelay, vulnerableServers);
@@ -511,14 +588,14 @@ async function multiStaggeredHack(ns) {
     for (let i = 0; i < topN; i++) {
         let server = hackableServers[i]
         if (server != undefined) {
-            let primed = isPrimed(ns, server);
+            let primed = await isPrimed(ns, server);
             if (primed) {
                 // ns.print(`Is Primed! Attacking: ${server}`)
                 await batchAttack(ns, server);
             }
             else {
-                if (!serverMap.get(server).isPriming()) {
-                    await ns.print(`Is Priming: ${server} MAX: ${ns.getServerMaxMoney(server)}, CURRENT: ${ns.getServerMoneyAvailable(server)}`)
+                if (!serverMap[server].isPriming()) {
+                    // await ns.print(`Is Priming: ${server} MAX: ${ns.getServerMaxMoney(server)}, CURRENT: ${ns.getServerMoneyAvailable(server)}`)
                     await primeServer(ns, server);
                 } else {
                     await ns.print("Already Priming!");
@@ -528,12 +605,14 @@ async function multiStaggeredHack(ns) {
     }
 }
 
-function isPrimed(ns, server) {
+async function isPrimed(ns, server) {
+    let primed = serverMap[server].isPrimed();
+    if (primed) { return true; }
     let availalbeMoney = ns.getServerMoneyAvailable(server);
     let maxMoney = ns.getServerMaxMoney(server);
     let securityLvl = ns.getServerSecurityLevel(server);
     let minSecurity = ns.getServerMinSecurityLevel(server);
-    return ((availalbeMoney >= maxMoney) && (securityLvl <= minSecurity)) || serverMap.get(server).isPrimed();
+    return ((availalbeMoney >= maxMoney) && (securityLvl <= minSecurity));
 }
 
 /**
