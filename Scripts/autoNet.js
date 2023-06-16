@@ -5,17 +5,23 @@ import {
 	HOME, MAX_SERVER_RAM, MAX_SERVER_COST
 } from "lib/customConstants.js";
 import infectVulnerableServer from "infect.js";
+import {
+	disableLogs
+} from 'lib/util.js'
 const LVL = 0;
 const RAM = 1;
 const CORE = 2;
 const DEATH_MSG = "AUTO_NET"
 const SERVER_MODIFIER = 0.01; // The lower this value, the more favored Servers are to be purchased.
+// Once this memory threshold is met/passed for all alpha servers, start investing in buying home ram & cores!
+var serverInvestmentThreshold = 4000;
 var serverIter = 0;
 var maxServersPurchased = false;
 var purchaseServersOnly = false;
 // TODO: Rework to include purchase of servers & upgrading!
 // ns.upgradePurchasedServer() makes buying servers earlier WAY worth while!!!
 export async function main(ns) {
+	disableLogs(ns);
 	ns.disableLog('sleep');
 	ns.disableLog('getServerMoneyAvailable');
 	if (ns.args.length > 0 && ns.args[0] == "-s") {
@@ -39,6 +45,16 @@ export async function main(ns) {
 
 		if (!paused) {
 			if (purchaseServersOnly || await checkServerPurchase(ns)) {
+				// TODO: Rework to incorperate more buying options...
+				if (serverInvestmentThresholdIsSurpassed(ns)) {
+					let coreCost = ns.singularity.getUpgradeHomeCoresCost();
+					let ramCost = ns.singularity.getUpgradeHomeRamCost();
+					if (coreCost < ramCost) {
+						ns.singularity.upgradeHomeCores();
+					} else {
+						ns.singularity.upgradeHomeRam();
+					}
+				}
 				// Attempt purchase
 				await newpurchaseServer(ns);
 				// await purchaseServer(ns);
@@ -237,9 +253,6 @@ async function newpurchaseServer(ns) {
 				}
 			}
 		});
-		// TODO: Upgrade servers!
-		// 	getPurchasedServerUpgradeCost(hostname, ram)
-		// 	upgradePurchasedServer(hostname, ram)
 		return;
 	}
 
@@ -268,4 +281,23 @@ async function newpurchaseServer(ns) {
 		// Unable to purchase server
 		await ns.print(`Saving for server purchase... price:${serverCost}`)
 	}
+}
+
+function serverInvestmentThresholdIsSurpassed(ns) {
+	// Count number of servers purchased by the player accessible from home scan
+	let servers = ns.scan(HOME);
+	let counter = 0;
+	servers.forEach(server => {
+		let serverRef = ns.getServer(server);
+		let bought = serverRef.purchasedByPlayer;
+		let passesThreshold = serverRef.maxRam > serverInvestmentThreshold;
+		// ns.print(`Server: ${server}, Ram/Threshold: ${serverRef.maxRam}/${serverInvestmentThreshold}`)
+		if (bought && passesThreshold) {
+			counter++;
+		}
+	});
+	if (ns.getPurchasedServerLimit() <= counter) {
+		return true;
+	}
+	return false;
 }
