@@ -9,13 +9,20 @@ const LVL = 0;
 const RAM = 1;
 const CORE = 2;
 const DEATH_MSG = "AUTO_NET"
-const SERVER_MODIFIER = 0.2;
+const SERVER_MODIFIER = 0.01; // The lower this value, the more favored Servers are to be purchased.
 var serverIter = 0;
 var maxServersPurchased = false;
-
+var purchaseServersOnly = false;
+// TODO: Rework to include purchase of servers & upgrading!
+// ns.upgradePurchasedServer() makes buying servers earlier WAY worth while!!!
 export async function main(ns) {
 	ns.disableLog('sleep');
 	ns.disableLog('getServerMoneyAvailable');
+	if (ns.args.length > 0 && ns.args[0] == "-s") {
+		ns.print("Servers only!")
+		purchaseServersOnly = true
+	}
+
 	let paused = false;
 	while (ns.hacknet.numNodes() < ns.hacknet.maxNumNodes()) {
 		switch (ns.readPort(AUTO_NODE_INBOUND_PORT)) {
@@ -31,9 +38,10 @@ export async function main(ns) {
 		}
 
 		if (!paused) {
-			if (await checkServerPurchase(ns)) {
+			if (purchaseServersOnly || await checkServerPurchase(ns)) {
 				// Attempt purchase
-				await purchaseServer(ns);
+				await newpurchaseServer(ns);
+				// await purchaseServer(ns);
 			} else { // Buy & upgrade nodes
 				let newNodeRatio = await calcNewNodeValueRatio(ns);
 
@@ -204,29 +212,60 @@ async function checkServerPurchase(ns) {
 	return false;
 }
 
-async function purchaseServer(ns) {
-
+// TODO: Revamp to purchase the most expensive server I currently can until all slots are full.
+// 				Then proceed to try and upgrade them all to the max!
+async function newpurchaseServer(ns) {
+	let bal = ns.getServerMoneyAvailable(HOME)
 	// Set flag to disable future server purchase attempts
 	if (ns.getPurchasedServerLimit() <= ns.getPurchasedServers().length) {
-		maxServersPurchased = true;
-		await ns.print(`Server capactity maxxed!`)
+		// maxServersPurchased = true; // TODO: Only want to trigger this now if servers are fully upgraded aswell!
+		await ns.print(`Server capactity maxxed! Upgrading...`)
+		let currentRam = Infinity;
+		let upgradeCost = Infinity;
+		ns.getPurchasedServers().forEach(server => {
+			// Check if it can be upgraded!
+			currentRam = ns.getServerMaxRam(server);
+			if (currentRam < MAX_SERVER_RAM) {
+				let ram = 2;
+				// Calculates highest amount of ram I can afford to upgrade by at the moment!
+				while (ns.getPurchasedServerCost(ram * 2) < bal && ram < MAX_SERVER_RAM - currentRam) {
+					ram = ram * 2; //Math.pow(ram, 2);
+				}
+				let upgradeCost = ns.getPurchasedServerUpgradeCost(server, ram)
+				if (upgradeCost < bal) {
+					ns.upgradePurchasedServer(server, ram);
+				}
+			}
+		});
+		// TODO: Upgrade servers!
+		// 	getPurchasedServerUpgradeCost(hostname, ram)
+		// 	upgradePurchasedServer(hostname, ram)
 		return;
 	}
 
-	let serverCost = await ns.getPurchasedServerCost(MAX_SERVER_RAM);
-	let bal = await ns.getServerMoneyAvailable(HOME)
+	let maxServerCost = await ns.getPurchasedServerCost(MAX_SERVER_RAM);
+
+	let ram = 2;
+	// Calc max server cost! (min size of X)
+	while (ns.getPurchasedServerCost(ram * 2) < bal && ram < MAX_SERVER_RAM) {
+		ram = ram * 2; //Math.pow(ram, 2);
+	}
+	let serverCost = ns.getPurchasedServerCost(ram);
+	ns.print(`Ram: ${ram}, cost:${serverCost}`)
+
 	if (serverCost < bal) {
 		let serverName = `alpha-${serverIter}`;
 		while (await ns.serverExists(serverName)) {
 			serverIter++;
+			if (serverIter > 24) { serverIter = 0 }
 			serverName = `alpha-${serverIter}`;
 		}
-		await ns.purchaseServer(serverName, MAX_SERVER_RAM);
+		await ns.purchaseServer(serverName, ram);
 		await ns.print(`PURCHASED: ${serverName}`)
 		await infectVulnerableServer(ns, serverName);
 
 	} else {
 		// Unable to purchase server
-		await ns.print(`Saving for server purchase...`)
+		await ns.print(`Saving for server purchase... price:${serverCost}`)
 	}
 }
