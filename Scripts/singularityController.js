@@ -12,9 +12,11 @@ import {
     SERVER_MAX_GROWTH_RATE,
     SERVER_FORTIFY_AMOUNT,
     SERVER_LIST,
+    PURCHASED_SERVER_LIST,
     FULL_SERVER_LIST,
     EXPLOIT_CHECK,
     LVL_UP_CHECK,
+    FACTION_CONTROLLER,
     PRIME_ATTACK,
     EXPLOIT_LIST,
     PURCHASE_EVENT_LIST,
@@ -22,7 +24,8 @@ import {
     BRUTE, FTP_CRACK, HTTP_WORM, REPLAY_SMTP, SQL_INJECT,
     PURCHASE_PHASE,
     TO_BACK_DOOR,
-    FACTIONS_TO_AUTOJOIN
+    FACTIONS_TO_AUTOJOIN,
+    CRIME, CLASS, CREATE_PROGRAM, GRAFTING, FACTION, COMPANY, WORK_TYPES
 } from "lib/customConstants.js";
 import {
     disableLogs,
@@ -39,6 +42,7 @@ let blockedEvents = []
 let controlCycle = new Map();
 // controlCycle.set(EXPLOIT_CHECK, function (ns) { exploitCheck(ns) });
 controlCycle.set(LVL_UP_CHECK, function (ns) { levelUpCheck(ns) });
+controlCycle.set(FACTION_CONTROLLER, function (ns) { joinFactions(ns) });
 // // controlCycle.set(EVALUATE_TARGETS, function (ns) { primeHackableServers(ns) });
 controlCycle.set(PRIME_ATTACK, function (ns) { multiStaggeredHack(ns) });
 let purchasePhases = new Map();
@@ -49,6 +53,7 @@ var vulnerableServers; // List of servers that have already been cracked (Possib
 var serversToExploit;
 var hackableServers;
 var notHackableServers;
+var serversToBackdoor;
 
 var hackingLvl;
 var baseDelay;
@@ -63,19 +68,6 @@ var forceAttack = false;
  * @param {NS} ns */
 export async function main(ns) {
     await init(ns);
-    ns.print("Hackable Servers: ", hackableServers)
-    ns.print("Vulnerable Servers: ", vulnerableServers)
-    ns.print("Servers To Exploit: ", serversToExploit)
-    ns.print("ServerMap key length: ", serverMap.entries())
-    // let keys = []
-    // for (let key of serverMap){
-    // 	keys.push(key)
-    // }
-    // ns.print(`ServerMap keys: ${keys}`)
-    // for (let [key, value] of serverMap.entries()) {
-    // 	ns.print(`ServerMap keys: ${key}`)
-    // }
-
     /**
      * ControlCycle is basically a setup loop for listeners!
      * Things to include in controlCycle
@@ -88,6 +80,7 @@ export async function main(ns) {
      * 	I do need the ability to do blocking procedures...
      * 		- prevent other controlCycle stuff from running
      * 				- Specify what to blockby eventID
+     * 		Consider changing this to use *Phase* class?
      * #######################################################
      */
     let running = true;
@@ -100,7 +93,6 @@ export async function main(ns) {
         }
         await ns.sleep(25);
     }
-    // ### Faction joining & rep gaining automation!
     // ### Work Automation system? (Focus state management system?)
     // ### Augmentation purchase automation!
 }
@@ -111,6 +103,7 @@ async function init(ns) {
     if (ns.args.length > 0) {
         forceAttack = true;
     }
+    initServersToBackdoor(ns);
     serverMap = new Map();
     disableLogs(ns);
     hackingLvl = 1;
@@ -133,6 +126,16 @@ async function init(ns) {
     // Should be re-run after every vulnerable server is added!
     sortVulnerableServersByFreeRam(ns);
     ns.print("##########################\n#Initialization complete.#\n##########################")
+}
+
+function initServersToBackdoor(ns) {
+    serversToBackdoor = []
+    TO_BACK_DOOR.forEach(server => {
+        // Check Server Exists & is not backdoored already
+        if (ns.serverExists(server) && !ns.getServer(server).backdoorInstalled) {
+            serversToBackdoor.push(server)
+        }
+    })
 }
 
 /**
@@ -177,8 +180,12 @@ function initPurchasePhases(ns) {
             new Phase(PURCHASING_EXPLOIT, function (ns) { tryBuyExploits(ns) }, [],
                 false,	// blocked
                 true, 	//active
-            ))
+            ));
     }
+    // Might be better to move this to an external program to run along side this one...
+    // - Less blocking of hacking scripts that way!
+    // - Or maybe I should do it the other way around, where the hacking scripts are moved out...
+    // 		- Still need serverMap communication though...
     // ### Home server upgrade automation!
     //		- might do to move these to a version of my auto script?
     // - Ram upgrade
@@ -269,8 +276,17 @@ export async function countExploits(ns) {
 function processServersToNodes(ns) {
     // Converts flat map of hostnames to serverNodes
     FULL_SERVER_LIST.forEach(server => {
-        serverToNode(ns, server)
+        serverToNode(ns, server);
     })
+
+    let alpha_list = ns.scan(HOME)
+    for (let i = 0; i < alpha_list.length; i++) {
+        let server = alpha_list[i];
+        if (server.includes("alpha-")) {
+            ns.print("Server => Node:", server)
+            serverToNode(ns, server);
+        }
+    }
     // Sets serverNode's subServers to lists of serverNodes
     FULL_SERVER_LIST.forEach(server => {
         let subServerHostnames = ns.scan(server)
@@ -295,15 +311,19 @@ function serverToNode(ns, server) {
  * traverseServerNodes(ns, initServerNode, processServerNode)
  */
 async function traverseServerNodes(ns, serverNode, toRun) {
-    ns.print(`TRAVERSING => ${serverNode.getHostname()}`)
+    if (serverNode === undefined || !ns.serverExists(serverNode.getHostname())) {
+        ns.print("ERROR: Traversal failed.")
+        return;
+    }
+    // ns.print(`TRAVERSING => ${serverNode.getHostname()}`)
     let subServers = serverNode.getSubServers();
     serverNode.setTraversed();
-
     for (let i = 0; i < subServers.length; i++) {
         let subServer = subServers[i];
-        ns.print(`SUB	-> ${subServer.getHostname()} -> ${subServer.isTraversed()}`)
+        if (subServer === undefined) { continue; }
+        // ns.print(`SUB	-> ${subServer.getHostname()} -> ${subServer.isTraversed()}`)
         if (!subServer.isTraversed()) {
-            ns.print(`T -> ${subServer}`)
+            // ns.print(`T -> ${subServer}`)
             await traverseServerNodes(ns, subServer, toRun)
         }
     }
@@ -345,7 +365,7 @@ async function isHackable(ns, server) {
     let reqHackingLvl = ns.getServerRequiredHackingLevel(server);
     if (ns.getHackingLevel() >= reqHackingLvl && ns.hasRootAccess(server) && !isMyServer(server)) {
         hackableServers.push(server);
-        if (TO_BACK_DOOR.includes(server)) {
+        if (serversToBackdoor.includes(server)) {
             ns.print("BACKDOORING: ", server);
             await backdoor(ns, server);
         }
@@ -360,9 +380,8 @@ async function isHackable(ns, server) {
  * ##########################################################################################
  * Connects routing/pathing for backdooring automagically
  * [] TODO: use exec to run backdoor on a seperate program so as to not block this one!
-* 		- communicate w/ port for blocking movements from the server/backdooring other servers?
- * 			- I should test if I can connect to/start backdooring other servers simultanioustly...
- * For now, we just limit auto-backdooring to faction only servers!
+* 		- Keep track of the process to see if it's completed backdooring before moving on to
+                EXEC the next one! (This method avoids having to use ports!)
  * ##########################################################################################
  */
 async function backdoor(ns, server) {
@@ -438,6 +457,98 @@ function calcProfitRating(ns, server) {
     return profitRating;
 }
 
+/**
+ * #################################################
+ * 					Join Factions Automagikalli
+ * 		[] Intelligently schedule tasks to meet
+ * 			 faction elegability requirements.
+ * 		[] Choose which factions to buy augs for?
+ * 				- Choose which exclusive factions to
+ * 					join based on AUGs needed!
+ * 					- Make list of exclusive AUGs!
+ * [] REP gaining automation!
+ * 		- based on AUGs we are targeting!
+ * #################################################
+ */
+async function joinFactions(ns) {
+    // Join Factions (That don't block other factions)
+    let factionInvitations = await ns.singularity.checkFactionInvitations();
+    factionInvitations.forEach(invite => {
+        if (invite !== undefined && FACTIONS_TO_AUTOJOIN.includes(invite)) {
+            ns.singularity.joinFaction(invite);
+            ns.print("Joined Faction:", invite)
+        }
+    })
+
+
+}
+
+/**
+ * TODO: Process different work types to see if we should switch off them
+ */
+async function ProcessWork(ns) {
+    let currentWork = ns.singularity.getCurrentWork();
+    let workType = currentWork.type;
+    // Should it be doing this work type presently?
+    // Need some way of evaluating current Focus vs what we COULD be doing...
+    if (WORK_TYPES.includes(workType)) {
+        switch (workType) {
+            case CRIME:
+                break;
+            case CLASS:
+                break;
+            case CREATE_PROGRAM:
+                break;
+            case GRAFTING:
+                break;
+            case FACTION:
+                // Process Faction work to see if it should continue...?
+                processFactionWork(ns, currentWork);
+                break;
+            case COMPANY:
+                break;
+            default:
+                ns.print(`Work Type not found: ${WORK_TYPES}`)
+        }
+    } else {
+        ns.print(`Work Type not found: ${WORK_TYPES}`)
+        // If not busy, start doing something~
+        //	- faction work default?
+    }
+}
+
+function processFactionWork(ns, currentWork) {
+    // Which faction are we working for?
+    // What kind of work are we doing?
+    // Which AUGs do they have? What is the rep gain rate? What are their AUG prices?
+    // Should return either a yes or no for if we should continue doing this.
+    // Should still be able to interupt in other Work Processes!
+    // "type":"FACTION","cyclesWorked":17335,"factionWorkType":"hacking","factionName":"Tian Di Hui"
+    // Who we're currently doing work for
+    let factionName = currentWork.factionName;
+    // Type of work we're doing
+    /**
+     * 			### Type of work we're doing ###
+     * TODO: optimize for what kind of faction work we should 'be doing based on our stats 
+     * (What gives the most rep/are we training hacking vs physical stats rn?)
+     */
+    let factionWorkType = currentWork.factionWorkType;
+
+    // Check if faction rep for most rep pricy AUG is met already?
+    // 	- switch to money making task?
+    // 	- or switch to gaining rep for another Faction
+    // TODO: Need to keep track of factions that I've joined AUGs?
+    //		- would probably be better to have this info ahead of time, so I could work towards joining needed factions.
+    let factionAugs = ns.singularity.getAugmentationsFromFaction(factionName)
+}
+
+/**
+ * Lot to do here!
+ * [] Check BACKDOOR servers! pop em' off if we do backdoor one?
+ * 			- Exec a backdoor script that handles it? (Needs to block other backdoor scripts though...)
+ * 					- best would be to do one at a time, and queue others up after...?
+ * 			- trigger that check here maybe!
+ */
 async function levelUpCheck(ns) {
     // Checks if there are no un-hackable servers remaining, will remove this from controlCycle
     if (notHackableServers.length < 1) {
@@ -457,6 +568,12 @@ async function levelUpCheck(ns) {
         ) {
             server = notHackableServers.shift();
             hackableServers.push(server);
+            // Attempts to backdoor.
+            // TODO: make this an exec instead?
+            if (serversToBackdoor.includes(server)) {
+                ns.print("BACKDOORING: ", server);
+                await backdoor(ns, server);
+            }
         }
         // sort after adding
         sortHackableServers(ns);
@@ -478,6 +595,7 @@ function calcHostRam(ns) {
 }
 
 async function primeServer(ns, server) {
+    ns.print("PRIMING SERVER")
     let weakenTime = ns.getWeakenTime(server);
     let cores = ns.getServer(HOME).cpuCores; //1
     let coreBonus = 1 + (cores - 1) / 16;
@@ -501,8 +619,8 @@ async function primeServer(ns, server) {
     let weakenThreads = Math.ceil(securityDiff / (coreBonus * SERVER_WEAKEN_AMOUNT));
 
     distributeLoad(ns, server, WEAKEN, weakenThreads, 0, vulnerableServers);
-    ns.print("Sleeping for:", (weakenTime * 2))
-    await ns.asleep(weakenTime * 2);
+    ns.print("Sleeping for:", (weakenTime * 1.01))
+    await ns.asleep(weakenTime * 1.01);
     // Prevents the script from trying to prime this server again!
     serverMap[server].setPrimed(true)
     serverMap[server].setPriming(false);
@@ -577,6 +695,8 @@ async function batchAttack(ns, server) {
         distributeLoad(ns, server, WEAKEN, weakenHackThreads, hackingWeakeningDelay, vulnerableServers);
         distributeLoad(ns, server, GROW, growthThreads, growthDelay, vulnerableServers);
         distributeLoad(ns, server, WEAKEN, weakenGrowthThreads, growthWeakeningDelay, vulnerableServers);
+    } else {
+        ns.print(`${Date.now()} Can't attack, need ${batchRam}/${availableHostRam}`)
     }
 }
 
@@ -598,7 +718,7 @@ async function multiStaggeredHack(ns) {
                     // await ns.print(`Is Priming: ${server} MAX: ${ns.getServerMaxMoney(server)}, CURRENT: ${ns.getServerMoneyAvailable(server)}`)
                     await primeServer(ns, server);
                 } else {
-                    await ns.print("Already Priming!");
+                    // await ns.print("Already Priming!");
                 }
             }
         }
