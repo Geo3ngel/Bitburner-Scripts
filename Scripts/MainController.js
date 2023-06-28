@@ -20,12 +20,19 @@ import Service from 'lib/Service.js'
 export default class MainControllerService extends Service {
 	constructor(name, port, pollingRate=30){
 		super(name, port, pollingRate);
-		// TODO: Put FactionMgrService specific vars here
 	}
 
-	parseDatagram(ns, datagram){
-		// TODO: Customize!
-		ns.print(`MAIN SERVICE:: ${datagram.id}`)
+	/**
+	 * Sets up the Dictionary mapping Services to value proccessing.
+	 */
+	initProccessDict(){
+		// TODO Map ACTION_NAMES to ACTIONS
+		// this.ACTION_MAP.set(key, value);
+		// let primingProcessMap = new Map();
+		// primingProcessMap.set("server", targetServer);
+
+		// // Might end up having to use 'super' instead of 'this'
+		// this.serviceProccessDictionary.set(PRIMING_SERVICE, primingProcessMap);
 	}
 }
  
@@ -42,6 +49,7 @@ export async function main(ns) {
 
 // TODO: Port releveant stuff over from Singlularity Controller
 // TODO: Split up services from Singlularity Controller!
+// TODO: Start & Kill other services as needed!
 
 /**
  * #####################
